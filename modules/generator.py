@@ -1,10 +1,11 @@
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-from modules.util import ResBlock2d, SameBlock2d, UpBlock2d, DownBlock2d, sparse_kp_displacement
+from modules.util import ResBlock2d, SameBlock2d, UpBlock2d, DownBlock2d
 from modules.dense_motion import DenseMotionNetwork
-
-
+from modules.odenet import ODENet
+from modules.appearance_flow import FlowGen
 class OcclusionAwareGenerator(nn.Module):
     """
     Generator that given source image and and keypoints try to transform image according to movement trajectories
@@ -21,8 +22,12 @@ class OcclusionAwareGenerator(nn.Module):
                                                            **dense_motion_params)
         else:
             self.dense_motion_network = None
-
+        self.ode = ODENet()
         self.first = SameBlock2d(num_channels, block_expansion, kernel_size=(7, 7), padding=(3, 3))
+
+        self.flow_param = {'input_dim': 3, 'dim': 64, 'n_res': 2, 'activ': 'relu',
+                           'norm_conv': 'ln', 'norm_flow': 'in', 'pad_type': 'reflect', 'use_sn': False}
+        self.appearance_flow=FlowGen(**self.flow_param)
 
         down_blocks = []
         for i in range(num_down_blocks):
@@ -46,7 +51,7 @@ class OcclusionAwareGenerator(nn.Module):
         self.final = nn.Conv2d(block_expansion, num_channels, kernel_size=(7, 7), padding=(3, 3))
         self.estimate_occlusion_map = estimate_occlusion_map
         self.num_channels = num_channels
-        self.sparse_kp_displacement=sparse_kp_displacement(num_kp+1,num_kp+1)
+
     def deform_input(self, inp, deformation):
         _, h_old, w_old, _ = deformation.shape
         _, _, h, w = inp.shape
@@ -57,10 +62,23 @@ class OcclusionAwareGenerator(nn.Module):
         return F.grid_sample(inp, deformation)
 
     def forward(self, source_image, kp_driving, kp_source):
-        delta=kp_driving['value']-kp_source['value']
-        delta=torch.cat([torch.tensor([[0,0]]),delta],dim=0) # K+1 elements
-        # TODO: implement self.sparse_kp_displacement
-        T=self.sparse_kp_displacement(delta)
+        # Transforming feature representation according to deformation and occlusion
+        output_dict = {}
+
+        if self.dense_motion_network is not None:
+            dense_motion = self.dense_motion_network(source_image=source_image, kp_driving=kp_driving,
+                                                     kp_source=kp_source)
+            output_dict['mask'] = dense_motion['mask']
+            output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
+
+            if 'occlusion_map' in dense_motion:
+                occlusion_map = dense_motion['occlusion_map']
+                output_dict['occlusion_map'] = occlusion_map
+            else:
+                occlusion_map = None
+            deformation = dense_motion['deformation']
+        # delta=kp_driving['value']-kp_source['value']
+        # delta=torch.cat([torch.zeros_like(delta.cpu()[:,:1,:,:]).to('cuda'),delta],dim=1) # K+1 elements
 
         # Encoding (downsampling) part, out是特征F_S
         out = self.first(source_image)
@@ -69,16 +87,13 @@ class OcclusionAwareGenerator(nn.Module):
 
         # Transforming feature representation according to deformation and occlusion
         output_dict = {}
-        if self.dense_motion_network is not None:
-            # TODO: implement self.dense_motion_network
-            dense_motion = self.dense_motion_network(T) # 求解ODE,返回F_{S->D}
+        if self.ode is not None:
+            dense_motion = self.ode(deformation) # 求解ODE,返回F_{S->D} 1*64*64*2
 
             out = self.deform_input(out, dense_motion) # F_{SD}
 
-        if self.self_app_network is not None:
-            # TODO: implement self.self_app_network
-            T_app = self.self_app_network(out)
-
+        if self.appearance_flow is not None:
+            T_app = self.appearance_flow(out)
             F_app = self.deform_input(out, T_app) # F_{SD}
 
         out=torch.cat([out,F_app],dim=1)

@@ -244,30 +244,3 @@ class AntiAliasInterpolation2d(nn.Module):
 
         return out
 
-
-class sparse_kp_displacement(nn.Module):
-    def __init__(self,in_dims,out_dims):
-        super(sparse_kp_displacement, self).__init__()
-        self.conv1 = nn.Conv1d(in_channels=in_dims, out_channels=10, kernel_size=3, stride=2)
-        self.max_pool1 = nn.MaxPool1d(kernel_size=3, stride=2)
-        self.conv2 = nn.Conv1d(10, 20, 3, 2)
-        self.max_pool2 = nn.MaxPool1d(3, 2)
-        self.conv3 = nn.Conv1d(20, 40, 3, 2)
-
-        self.liner1 = nn.Linear(40 * 14, 120)
-        self.liner2 = nn.Linear(120, 84)
-        self.liner3 = nn.Linear(84, out_dims)
-
-    def forward(self, x):
-        out = F.relu(self.conv1(x))
-        out = self.max_pool1(out)
-        out = F.relu(self.conv2(out))
-        out = self.max_pool2(out)
-        out = F.relu(self.conv3(out))
-
-        out = out.view(-1, 40 * 14)
-        out = F.relu(self.liner1(out))
-        out = F.relu(self.liner2(out))
-        out = self.liner3(out)
-
-        return torch.dot(out,x)

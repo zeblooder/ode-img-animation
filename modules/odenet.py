@@ -7,25 +7,22 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--tol', type=float, default=1e-3)
-parser.add_argument('--adjoint', type=eval, default=True, choices=[True, False])
-parser.add_argument('--nepochs', type=int, default=160)
-parser.add_argument('--data_aug', type=eval, default=True, choices=[True, False])
-parser.add_argument('--lr', type=float, default=0.1)
-parser.add_argument('--batch_size', type=int, default=128)
-parser.add_argument('--test_batch_size', type=int, default=1000)
-
-parser.add_argument('--save', type=str, default='./experiment1')
-parser.add_argument('--debug', action='store_true')
-parser.add_argument('--gpu', type=int, default=0)
-args = parser.parse_args()
-
-if args.adjoint:
-    from torchdiffeq import odeint_adjoint as odeint
-else:
-    from torchdiffeq import odeint
+from torchdiffeq import odeint_adjoint, odeint
+from .util import SameBlock2d
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--tol', type=float, default=1e-3)
+# parser.add_argument('--adjoint', type=eval, default=True, choices=[True, False])
+# parser.add_argument('--nepochs', type=int, default=160)
+# parser.add_argument('--data_aug', type=eval, default=True, choices=[True, False])
+# parser.add_argument('--lr', type=float, default=0.1)
+# parser.add_argument('--batch_size', type=int, default=128)
+# parser.add_argument('--test_batch_size', type=int, default=1000)
+#
+# parser.add_argument('--save', type=str, default='./experiment1')
+# parser.add_argument('--debug', action='store_true')
+# parser.add_argument('--gpu', type=int, default=0)
+# args = parser.parse_args()
+#
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -84,14 +81,17 @@ class ODEfunc(nn.Module):
 
 class ODEBlock(nn.Module):
 
-    def __init__(self, odefunc):
+    def __init__(self, odefunc, adjoint=True,tol=1e-3):
+
         super(ODEBlock, self).__init__()
         self.odefunc = odefunc
         self.integration_time = torch.tensor([0, 1]).float()
+        self.tol=tol
+        self.odeint= odeint_adjoint if adjoint else odeint
 
     def forward(self, x):
         self.integration_time = self.integration_time.type_as(x)
-        out = odeint(self.odefunc, x, self.integration_time, rtol=args.tol, atol=args.tol)
+        out = self.odeint(self.odefunc, x, self.integration_time, rtol=self.tol, atol=self.tol)
         return out[1]
 
 
@@ -143,16 +143,16 @@ def one_hot(x, K):
     return np.array(x[:, None] == np.arange(K)[None, :], dtype=int)
 
 
-def accuracy(model, dataset_loader):
-    total_correct = 0
-    for x, y in dataset_loader:
-        x = x.to(device)
-        y = one_hot(np.array(y.numpy()), 10)
-
-        target_class = np.argmax(y, axis=1)
-        predicted_class = np.argmax(model(x).cpu().detach().numpy(), axis=1)
-        total_correct += np.sum(predicted_class == target_class)
-    return total_correct / len(dataset_loader.dataset)
+# def accuracy(model, dataset_loader):
+#     total_correct = 0
+#     for x, y in dataset_loader:
+#         x = x.to(device)
+#         y = one_hot(np.array(y.numpy()), 10)
+#
+#         target_class = np.argmax(y, axis=1)
+#         predicted_class = np.argmax(model(x).cpu().detach().numpy(), axis=1)
+#         total_correct += np.sum(predicted_class == target_class)
+#     return total_correct / len(dataset_loader.dataset)
 
 
 def count_parameters(model):
@@ -165,20 +165,21 @@ def makedirs(dirname):
 
 class ODENet(nn.Module):
     def __init__(self):
+        super(ODENet, self).__init__()
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        downsampling_layers = [
-            nn.Conv2d(1, 64, 3, 1),
-            norm(64),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, 4, 2, 1),
-            norm(64),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, 4, 2, 1),
-        ]
+        # downsampling_layers = [
+        #     nn.Conv2d(1, 64, 3, 1),
+        #     norm(64),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(64, 64, 4, 2, 1),
+        #     norm(64),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(64, 64, 4, 2, 1),
+        # ]
         feature_layers = [ODEBlock(ODEfunc(64))]
-        fc_layers = [norm(64), nn.ReLU(inplace=True), nn.AdaptiveAvgPool2d((1, 1)), Flatten(), nn.Linear(64, 10)]
+        # fc_layers = [norm(64), nn.ReLU(inplace=True), nn.AdaptiveAvgPool2d((1, 1)), (64,1,3)]
 
-        self.model = nn.Sequential(*downsampling_layers, *feature_layers, *fc_layers).to(device)
+        self.model = nn.Sequential(*feature_layers).to(device)
 
     def forward(self, x):
         return self.model(x)
