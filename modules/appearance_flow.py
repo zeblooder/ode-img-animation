@@ -31,7 +31,7 @@ class ConvColumn(nn.Module):
         self.up_sample = nn.ModuleList()
 
         self.down_sample += [nn.Sequential(
-            Conv2dBlock(input_dim * 2 + 1, dim // 2, 7, 1, 3, norm, activ, pad_type, use_sn=use_sn),
+            Conv2dBlock(input_dim, dim // 2, 7, 1, 3, norm, activ, pad_type, use_sn=use_sn),
             Conv2dBlock(dim // 2, dim, 4, 2, 1, norm, activ, pad_type, use_sn=use_sn),
             Conv2dBlock(dim, dim, 5, 1, 2, norm, activ, pad_type, use_sn=use_sn),
             Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm, activ, pad_type, use_sn=use_sn),
@@ -87,7 +87,7 @@ class FlowColumn(nn.Module):
         self.up_sample_flow = nn.ModuleList()
 
         self.down_sample_flow.append(nn.Sequential(
-            Conv2dBlock(input_dim * 2 + 1, dim // 2, 7, 1, 3, norm, activ, pad_type, use_sn=use_sn),
+            Conv2dBlock(input_dim, dim // 2, 7, 1, 3, norm, activ, pad_type, use_sn=use_sn),
             Conv2dBlock(dim // 2, dim, 4, 2, 1, norm, activ, pad_type, use_sn=use_sn),
             Conv2dBlock(dim, dim, 5, 1, 2, norm, activ, pad_type, use_sn=use_sn)))
         self.down_sample_flow.append(nn.Sequential(

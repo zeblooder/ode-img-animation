@@ -25,7 +25,7 @@ class OcclusionAwareGenerator(nn.Module):
         self.ode = ODENet()
         self.first = SameBlock2d(num_channels, block_expansion, kernel_size=(7, 7), padding=(3, 3))
 
-        self.flow_param = {'input_dim': 3, 'dim': 64, 'n_res': 2, 'activ': 'relu',
+        self.flow_param = {'input_dim': 256, 'dim': 64, 'n_res': 2, 'activ': 'relu',
                            'norm_conv': 'ln', 'norm_flow': 'in', 'pad_type': 'reflect', 'use_sn': False}
         self.appearance_flow=FlowGen(**self.flow_param)
 
@@ -37,6 +37,7 @@ class OcclusionAwareGenerator(nn.Module):
         self.down_blocks = nn.ModuleList(down_blocks)
 
         up_blocks = []
+        num_down_blocks+=1
         for i in range(num_down_blocks):
             in_features = min(max_features, block_expansion * (2 ** (num_down_blocks - i)))
             out_features = min(max_features, block_expansion * (2 ** (num_down_blocks - i - 1)))
@@ -93,8 +94,7 @@ class OcclusionAwareGenerator(nn.Module):
             out = self.deform_input(out, dense_motion) # F_{SD}
 
         if self.appearance_flow is not None:
-            T_app = self.appearance_flow(out)
-            F_app = self.deform_input(out, T_app) # F_{SD}
+            F_app, flow_maps = self.appearance_flow(out) # F_{SD}
 
         out=torch.cat([out,F_app],dim=1)
 
