@@ -78,8 +78,6 @@ class OcclusionAwareGenerator(nn.Module):
             else:
                 occlusion_map = None
             deformation = dense_motion['deformation']
-        # delta=kp_driving['value']-kp_source['value']
-        # delta=torch.cat([torch.zeros_like(delta.cpu()[:,:1,:,:]).to('cuda'),delta],dim=1) # K+1 elements
 
         # Encoding (downsampling) part, out是特征F_S
         out = self.first(source_image)

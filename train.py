@@ -58,7 +58,7 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
                 optimizer_generator.zero_grad()
                 optimizer_kp_detector.step()
                 optimizer_kp_detector.zero_grad()
-
+                # print(generator_full.generator.appearance_flow.flow_column.down_sample_flow.weight.grad)
                 if train_params['loss_weights']['generator_gan'] != 0:
                     optimizer_discriminator.zero_grad()
                     losses_discriminator = discriminator_full(x, generated)
