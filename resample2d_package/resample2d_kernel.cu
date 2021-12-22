@@ -51,8 +51,8 @@ __global__ void kernel_resample2d_update_output(const int n,
 
     scalar_t xf = static_cast<scalar_t>(x) + dx;
     scalar_t yf = static_cast<scalar_t>(y) + dy;
-    scalar_t alpha = xf - floor(xf); // alpha
-    scalar_t beta = yf - floor(yf); // beta
+    scalar_t alpha = xf - floorf(xf); // alpha
+    scalar_t beta = yf - floorf(yf); // beta
 
 
     int idim_h = DIM2(input1_size);
@@ -60,12 +60,12 @@ __global__ void kernel_resample2d_update_output(const int n,
 
 
     for (int fy = 0; fy < kernel_size/2; fy += 1) {
-        int yT = max(min( int (floor(yf)-fy*dilation),    idim_h-1), 0);
-        int yB = max(min( int (floor(yf)+(fy+1)*dilation),idim_h-1), 0);
+        int yT = max(min( int (floorf(yf)-fy*dilation),    idim_h-1), 0);
+        int yB = max(min( int (floorf(yf)+(fy+1)*dilation),idim_h-1), 0);
 
         for (int fx = 0; fx < kernel_size/2; fx += 1) {
-            int xL = max(min( int (floor(xf)-fx*dilation  ),    idim_w-1), 0);
-            int xR = max(min( int (floor(xf)+(fx+1)*dilation),  idim_w-1), 0);
+            int xL = max(min( int (floorf(xf)-fx*dilation  ),    idim_w-1), 0);
+            int xR = max(min( int (floorf(xf)+(fx+1)*dilation),  idim_w-1), 0);
 
             scalar_t xL_ = ( static_cast<scalar_t>( fx    *dilation)+alpha );
             scalar_t xR_ = ( static_cast<scalar_t>((1.+fx)*dilation)-alpha );
@@ -166,16 +166,16 @@ __global__ void kernel_resample2d_backward_input1(
 
 
     for (int fy = 0; fy < kernel_size/2; fy += 1) {
-        int yT = max(min( int (floor(yf)-fy*dilation),    idim_h-1), 0);
-        int yB = max(min( int (floor(yf)+(fy+1)*dilation),idim_h-1), 0);        
-        // int yT = max(min( int (floor(yf)-fy  ),    idim_h-1), 0);
-        // int yB = max(min( int (floor(yf)+fy+1),    idim_h-1), 0);
+        int yT = max(min( int (floorf(yf)-fy*dilation),    idim_h-1), 0);
+        int yB = max(min( int (floorf(yf)+(fy+1)*dilation),idim_h-1), 0);        
+        // int yT = max(min( int (floorf(yf)-fy  ),    idim_h-1), 0);
+        // int yB = max(min( int (floorf(yf)+fy+1),    idim_h-1), 0);
 
         for (int fx = 0; fx < kernel_size/2; fx += 1) {
-            int xL = max(min( int (floor(xf)-fx*dilation  ),    idim_w-1), 0);
-            int xR = max(min( int (floor(xf)+(fx+1)*dilation),  idim_w-1), 0);            
-            // int xL = max(min( int (floor(xf)-fx  ),    idim_w-1), 0);
-            // int xR = max(min( int (floor(xf)+fx+1),    idim_w-1), 0);
+            int xL = max(min( int (floorf(xf)-fx*dilation  ),    idim_w-1), 0);
+            int xR = max(min( int (floorf(xf)+(fx+1)*dilation),  idim_w-1), 0);            
+            // int xL = max(min( int (floorf(xf)-fx  ),    idim_w-1), 0);
+            // int xR = max(min( int (floorf(xf)+fx+1),    idim_w-1), 0);
 
             scalar_t xL_ = ( static_cast<scalar_t>( fx    *dilation)+alpha );
             scalar_t xR_ = ( static_cast<scalar_t>((1.+fx)*dilation)-alpha );
@@ -241,8 +241,8 @@ __global__ void kernel_resample2d_backward_input2(
 
     scalar_t xf = static_cast<scalar_t>(x) + dx;
     scalar_t yf = static_cast<scalar_t>(y) + dy;
-    scalar_t alpha = xf - floor(xf); // alpha
-    scalar_t beta = yf - floor(yf); // beta
+    scalar_t alpha = xf - floorf(xf); // alpha
+    scalar_t beta = yf - floorf(yf); // beta
 
 
     int idim_h = DIM2(input1_size);
@@ -250,12 +250,12 @@ __global__ void kernel_resample2d_backward_input2(
     scalar_t sumgrad = 0.0;
 
     for (int fy = 0; fy < kernel_size/2; fy += 1) {
-        int yT = max(min( int (floor(yf)-fy*dilation),    idim_h-1), 0);
-        int yB = max(min( int (floor(yf)+(fy+1)*dilation),idim_h-1), 0);  
+        int yT = max(min( int (floorf(yf)-fy*dilation),    idim_h-1), 0);
+        int yB = max(min( int (floorf(yf)+(fy+1)*dilation),idim_h-1), 0);  
 
         for (int fx = 0; fx < kernel_size/2; fx += 1) {
-            int xL = max(min( int (floor(xf)-fx*dilation  ),    idim_w-1), 0);
-            int xR = max(min( int (floor(xf)+(fx+1)*dilation),  idim_w-1), 0);  
+            int xL = max(min( int (floorf(xf)-fx*dilation  ),    idim_w-1), 0);
+            int xR = max(min( int (floorf(xf)+(fx+1)*dilation),  idim_w-1), 0);  
 
             scalar_t xL_ = ( static_cast<scalar_t>( fx    *dilation)+alpha );
             scalar_t xR_ = ( static_cast<scalar_t>((1.+fx)*dilation)-alpha );
@@ -298,12 +298,12 @@ __global__ void kernel_resample2d_backward_input2(
         
 
     for (int fy = 0; fy < kernel_size/2; fy += 1) {
-        int yT = max(min( int (floor(yf)-fy*dilation),    idim_h-1), 0);
-        int yB = max(min( int (floor(yf)+(fy+1)*dilation),idim_h-1), 0);  
+        int yT = max(min( int (floorf(yf)-fy*dilation),    idim_h-1), 0);
+        int yB = max(min( int (floorf(yf)+(fy+1)*dilation),idim_h-1), 0);  
 
         for (int fx = 0; fx < kernel_size/2; fx += 1) {
-            int xL = max(min( int (floor(xf)-fx*dilation  ),    idim_w-1), 0);
-            int xR = max(min( int (floor(xf)+(fx+1)*dilation),  idim_w-1), 0);  
+            int xL = max(min( int (floorf(xf)-fx*dilation  ),    idim_w-1), 0);
+            int xR = max(min( int (floorf(xf)+(fx+1)*dilation),  idim_w-1), 0);  
 
             scalar_t xL_ = ( static_cast<scalar_t>( fx    *dilation)+alpha );
             scalar_t xR_ = ( static_cast<scalar_t>((1.+fx)*dilation)-alpha );
