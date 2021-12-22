@@ -42,13 +42,18 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
     discriminator_full = DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
 
     if torch.cuda.is_available():
-        generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)
-        discriminator_full = DataParallelWithCallback(discriminator_full, device_ids=device_ids)
+        generator_full=generator_full.cuda()
+        discriminator_full=discriminator_full.cuda()
+        # generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)
+        # discriminator_full = DataParallelWithCallback(discriminator_full, device_ids=device_ids)
 
     with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], checkpoint_freq=train_params['checkpoint_freq']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
             for x in dataloader:
+                x = {key: x[key].cuda() if type(x[key])==type(x['source']) else x[key] for key in x}
                 losses_generator, generated = generator_full(x)
+
+                torch.cuda.empty_cache()
 
                 loss_values = [val.mean() for val in losses_generator.values()]
                 loss = sum(loss_values)
@@ -58,7 +63,7 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
                 optimizer_generator.zero_grad()
                 optimizer_kp_detector.step()
                 optimizer_kp_detector.zero_grad()
-                # print(generator_full.generator.appearance_flow.flow_column.down_sample_flow.weight.grad)
+
                 if train_params['loss_weights']['generator_gan'] != 0:
                     optimizer_discriminator.zero_grad()
                     losses_discriminator = discriminator_full(x, generated)

@@ -79,10 +79,14 @@ class OcclusionAwareGenerator(nn.Module):
                 occlusion_map = None
             deformation = dense_motion['deformation']
 
+        torch.cuda.empty_cache()
+
         # Encoding (downsampling) part, out是特征F_S
         out = self.first(source_image)
         for i in range(len(self.down_blocks)):
             out = self.down_blocks[i](out)
+
+        torch.cuda.empty_cache()
 
         # Transforming feature representation according to deformation and occlusion
         output_dict = {}
@@ -96,6 +100,8 @@ class OcclusionAwareGenerator(nn.Module):
 
         out=torch.cat([out,F_app],dim=1)
 
+        torch.cuda.empty_cache()
+
         # Decoding part
         out = self.bottleneck(out)
         for i in range(len(self.up_blocks)):
@@ -103,6 +109,7 @@ class OcclusionAwareGenerator(nn.Module):
         out = self.final(out)
         out = F.sigmoid(out)
 
+        out = F.interpolate(out,scale_factor=0.5)
         output_dict["prediction"] = out
 
         return output_dict
