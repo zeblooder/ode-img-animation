@@ -1,5 +1,5 @@
 import os
-from skimage import io, img_as_float32
+from skimage import io, img_as_float32, transform
 from skimage.color import gray2rgb
 from sklearn.model_selection import train_test_split
 from imageio import mimread
@@ -23,7 +23,7 @@ def read_video(name, frame_shape):
         frames = sorted(os.listdir(name))
         num_frames = len(frames)
         video_array = np.array(
-            [img_as_float32(io.imread(os.path.join(name, frames[idx]))) for idx in range(num_frames)])
+            [img_as_float32(transform.resize(io.imread(os.path.join(name, frames[idx])),tuple(frame_shape[:2]))) for idx in range(num_frames)])
     elif name.lower().endswith('.png') or name.lower().endswith('.jpg'):
         image = io.imread(name)
 
@@ -40,7 +40,7 @@ def read_video(name, frame_shape):
         video_array = video_array.reshape((-1,) + frame_shape)
         video_array = np.moveaxis(video_array, 1, 2)
     elif name.lower().endswith('.gif') or name.lower().endswith('.mp4') or name.lower().endswith('.mov'):
-        video = np.array(mimread(name,memtest=False))
+        video = np.array([transform.resize(v, (256, 256)) for v in mimread(name,memtest=False)])
         if len(video.shape) == 3:
             video = np.array([gray2rgb(frame) for frame in video])
         if video.shape[-1] == 4:
