@@ -3,22 +3,45 @@
 # Author : Jiayuan Mao
 # Email  : maojiayuan@gmail.com
 # Date   : 27/01/2018
-# 
+#
 # This file is part of Synchronized-BatchNorm-PyTorch.
 # https://github.com/vacancy/Synchronized-BatchNorm-PyTorch
 # Distributed under MIT License.
 
 import collections
+import contextlib
 
 import torch
 import torch.nn.functional as F
 
 from torch.nn.modules.batchnorm import _BatchNorm
-from torch.nn.parallel._functions import ReduceAddCoalesced, Broadcast
 
-from .comm import SyncMaster
+try:
+    from torch.nn.parallel._functions import ReduceAddCoalesced, Broadcast
+except ImportError:
+    ReduceAddCoalesced = Broadcast = None
 
-__all__ = ['SynchronizedBatchNorm1d', 'SynchronizedBatchNorm2d', 'SynchronizedBatchNorm3d']
+try:
+    from jactorch.parallel.comm import SyncMaster
+    from jactorch.parallel.data_parallel import JacDataParallel as DataParallelWithCallback
+except ImportError:
+    from .comm import SyncMaster
+    from .replicate import DataParallelWithCallback
+
+__all__ = [
+    'set_sbn_eps_mode',
+    'SynchronizedBatchNorm1d', 'SynchronizedBatchNorm2d', 'SynchronizedBatchNorm3d',
+    'patch_sync_batchnorm', 'convert_model'
+]
+
+
+SBN_EPS_MODE = 'clamp'
+
+
+def set_sbn_eps_mode(mode):
+    global SBN_EPS_MODE
+    assert mode in ('clamp', 'plus')
+    SBN_EPS_MODE = mode
 
 
 def _sum_ft(tensor):
@@ -27,7 +50,7 @@ def _sum_ft(tensor):
 
 
 def _unsqueeze_ft(tensor):
-    """add new dementions at the front and the tail"""
+    """add new dimensions at the front and the tail"""
     return tensor.unsqueeze(0).unsqueeze(-1)
 
 
@@ -36,8 +59,15 @@ _MasterMessage = collections.namedtuple('_MasterMessage', ['sum', 'inv_std'])
 
 
 class _SynchronizedBatchNorm(_BatchNorm):
-    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True):
-        super(_SynchronizedBatchNorm, self).__init__(num_features, eps=eps, momentum=momentum, affine=affine)
+    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True):
+        assert ReduceAddCoalesced is not None, 'Can not use Synchronized Batch Normalization without CUDA support.'
+
+        super(_SynchronizedBatchNorm, self).__init__(num_features, eps=eps, momentum=momentum, affine=affine,
+                                                     track_running_stats=track_running_stats)
+
+        if not self.track_running_stats:
+            import warnings
+            warnings.warn('track_running_stats=False is not supported by the SynchronizedBatchNorm.')
 
         self._sync_master = SyncMaster(self._data_parallel_master)
 
@@ -54,6 +84,7 @@ class _SynchronizedBatchNorm(_BatchNorm):
 
         # Resize the input to (B, C, -1).
         input_shape = input.size()
+        assert input.size(1) == self.num_features, 'Channel size mismatch: got {}, expect {}.'.format(input.size(1), self.num_features)
         input = input.view(input.size(0), self.num_features, -1)
 
         # Compute the sum and square-sum.
@@ -119,10 +150,20 @@ class _SynchronizedBatchNorm(_BatchNorm):
         unbias_var = sumvar / (size - 1)
         bias_var = sumvar / size
 
-        self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean.data
-        self.running_var = (1 - self.momentum) * self.running_var + self.momentum * unbias_var.data
+        if hasattr(torch, 'no_grad'):
+            with torch.no_grad():
+                self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean.data
+                self.running_var = (1 - self.momentum) * self.running_var + self.momentum * unbias_var.data
+        else:
+            self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean.data
+            self.running_var = (1 - self.momentum) * self.running_var + self.momentum * unbias_var.data
 
-        return mean, bias_var.clamp(self.eps) ** -0.5
+        if SBN_EPS_MODE == 'clamp':
+            return mean, bias_var.clamp(self.eps) ** -0.5
+        elif SBN_EPS_MODE == 'plus':
+            return mean, (bias_var + self.eps) ** -0.5
+        else:
+            raise ValueError('Unknown EPS mode: {}.'.format(SBN_EPS_MODE))
 
 
 class SynchronizedBatchNorm1d(_SynchronizedBatchNorm):
@@ -142,7 +183,7 @@ class SynchronizedBatchNorm1d(_SynchronizedBatchNorm):
     is also easy to implement, but the statistics might be inaccurate.
     Instead, in this synchronized version, the statistics will be computed
     over all training samples distributed on multiple devices.
-    
+
     Note that, for one-GPU or CPU-only case, this module behaves exactly same
     as the built-in PyTorch implementation.
 
@@ -168,7 +209,7 @@ class SynchronizedBatchNorm1d(_SynchronizedBatchNorm):
         affine: a boolean value that when set to ``True``, gives the layer learnable
             affine parameters. Default: ``True``
 
-    Shape:
+    Shape::
         - Input: :math:`(N, C)` or :math:`(N, C, L)`
         - Output: :math:`(N, C)` or :math:`(N, C, L)` (same shape as input)
 
@@ -185,7 +226,6 @@ class SynchronizedBatchNorm1d(_SynchronizedBatchNorm):
         if input.dim() != 2 and input.dim() != 3:
             raise ValueError('expected 2D or 3D input (got {}D input)'
                              .format(input.dim()))
-        super(SynchronizedBatchNorm1d, self)._check_input_dim(input)
 
 
 class SynchronizedBatchNorm2d(_SynchronizedBatchNorm):
@@ -205,7 +245,7 @@ class SynchronizedBatchNorm2d(_SynchronizedBatchNorm):
     is also easy to implement, but the statistics might be inaccurate.
     Instead, in this synchronized version, the statistics will be computed
     over all training samples distributed on multiple devices.
-    
+
     Note that, for one-GPU or CPU-only case, this module behaves exactly same
     as the built-in PyTorch implementation.
 
@@ -231,7 +271,7 @@ class SynchronizedBatchNorm2d(_SynchronizedBatchNorm):
         affine: a boolean value that when set to ``True``, gives the layer learnable
             affine parameters. Default: ``True``
 
-    Shape:
+    Shape::
         - Input: :math:`(N, C, H, W)`
         - Output: :math:`(N, C, H, W)` (same shape as input)
 
@@ -248,7 +288,6 @@ class SynchronizedBatchNorm2d(_SynchronizedBatchNorm):
         if input.dim() != 4:
             raise ValueError('expected 4D input (got {}D input)'
                              .format(input.dim()))
-        super(SynchronizedBatchNorm2d, self)._check_input_dim(input)
 
 
 class SynchronizedBatchNorm3d(_SynchronizedBatchNorm):
@@ -268,7 +307,7 @@ class SynchronizedBatchNorm3d(_SynchronizedBatchNorm):
     is also easy to implement, but the statistics might be inaccurate.
     Instead, in this synchronized version, the statistics will be computed
     over all training samples distributed on multiple devices.
-    
+
     Note that, for one-GPU or CPU-only case, this module behaves exactly same
     as the built-in PyTorch implementation.
 
@@ -295,7 +334,7 @@ class SynchronizedBatchNorm3d(_SynchronizedBatchNorm):
         affine: a boolean value that when set to ``True``, gives the layer learnable
             affine parameters. Default: ``True``
 
-    Shape:
+    Shape::
         - Input: :math:`(N, C, D, H, W)`
         - Output: :math:`(N, C, D, H, W)` (same shape as input)
 
@@ -312,4 +351,62 @@ class SynchronizedBatchNorm3d(_SynchronizedBatchNorm):
         if input.dim() != 5:
             raise ValueError('expected 5D input (got {}D input)'
                              .format(input.dim()))
-        super(SynchronizedBatchNorm3d, self)._check_input_dim(input)
+
+
+@contextlib.contextmanager
+def patch_sync_batchnorm():
+    import torch.nn as nn
+
+    backup = nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d
+
+    nn.BatchNorm1d = SynchronizedBatchNorm1d
+    nn.BatchNorm2d = SynchronizedBatchNorm2d
+    nn.BatchNorm3d = SynchronizedBatchNorm3d
+
+    yield
+
+    nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d = backup
+
+
+def convert_model(module):
+    """Traverse the input module and its child recursively
+       and replace all instance of torch.nn.modules.batchnorm.BatchNorm*N*d
+       to SynchronizedBatchNorm*N*d
+
+    Args:
+        module: the input module needs to be convert to SyncBN model
+
+    Examples:
+        >>> import torch.nn as nn
+        >>> import torchvision
+        >>> # m is a standard pytorch model
+        >>> m = torchvision.models.resnet18(True)
+        >>> m = nn.DataParallel(m)
+        >>> # after convert, m is using SyncBN
+        >>> m = convert_model(m)
+    """
+    if isinstance(module, torch.nn.DataParallel):
+        mod = module.module
+        mod = convert_model(mod)
+        mod = DataParallelWithCallback(mod, device_ids=module.device_ids)
+        return mod
+
+    mod = module
+    for pth_module, sync_module in zip([torch.nn.modules.batchnorm.BatchNorm1d,
+                                        torch.nn.modules.batchnorm.BatchNorm2d,
+                                        torch.nn.modules.batchnorm.BatchNorm3d],
+                                       [SynchronizedBatchNorm1d,
+                                        SynchronizedBatchNorm2d,
+                                        SynchronizedBatchNorm3d]):
+        if isinstance(module, pth_module):
+            mod = sync_module(module.num_features, module.eps, module.momentum, module.affine)
+            mod.running_mean = module.running_mean
+            mod.running_var = module.running_var
+            if module.affine:
+                mod.weight.data = module.weight.data.clone().detach()
+                mod.bias.data = module.bias.data.clone().detach()
+
+    for name, child in module.named_children():
+        mod.add_module(name, convert_model(child))
+
+    return mod
