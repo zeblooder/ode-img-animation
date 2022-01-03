@@ -1,4 +1,4 @@
-from tqdm import trange
+from tqdm import trange,tqdm
 import torch
 
 from torch.utils.data import DataLoader
@@ -36,20 +36,20 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
 
     if 'num_repeats' in train_params or train_params['num_repeats'] != 1:
         dataset = DatasetRepeater(dataset, train_params['num_repeats'])
-    dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=6, drop_last=True)
-
+    dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
+    # print(len(dataset))
     generator_full = GeneratorFullModel(kp_detector, generator, discriminator, train_params)
     discriminator_full = DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
 
     if torch.cuda.is_available():
+        generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)
+        discriminator_full = DataParallelWithCallback(discriminator_full, device_ids=device_ids)
         generator_full=generator_full.cuda()
         discriminator_full=discriminator_full.cuda()
-        # generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)
-        # discriminator_full = DataParallelWithCallback(discriminator_full, device_ids=device_ids)
 
     with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], checkpoint_freq=train_params['checkpoint_freq']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
-            for x in dataloader:
+            for x in tqdm(dataloader):
                 x = {key: x[key].cuda() if type(x[key])==type(x['source']) else x[key] for key in x}
                 losses_generator, generated = generator_full(x)
 
@@ -83,7 +83,8 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
             scheduler_generator.step()
             scheduler_discriminator.step()
             scheduler_kp_detector.step()
-            
+            torch.cuda.empty_cache()
+
             logger.log_epoch(epoch, {'generator': generator,
                                      'discriminator': discriminator,
                                      'kp_detector': kp_detector,
