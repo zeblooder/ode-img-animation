@@ -1,5 +1,5 @@
 import numpy as np
-import torch
+import torch,sys
 from torch import nn
 import torch.nn.functional as F
 from modules.util import ResBlock2d, SameBlock2d, UpBlock2d, DownBlock2d
@@ -60,23 +60,23 @@ class OcclusionAwareGenerator(nn.Module):
             deformation = deformation.permute(0, 3, 1, 2)
             deformation = F.interpolate(deformation, size=(h, w), mode='bilinear')
             deformation = deformation.permute(0, 2, 3, 1)
-        return F.grid_sample(inp, deformation)
+        return F.grid_sample(inp, deformation, align_corners=True)
 
     def forward(self, source_image, kp_driving, kp_source):
         # Transforming feature representation according to deformation and occlusion
-        output_dict = {}
+        # output_dict = {}
 
         if self.dense_motion_network is not None:
             dense_motion = self.dense_motion_network(source_image=source_image, kp_driving=kp_driving,
                                                      kp_source=kp_source)
-            output_dict['mask'] = dense_motion['mask']
-            output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
+            # output_dict['mask'] = dense_motion['mask']
+            # output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
 
-            if 'occlusion_map' in dense_motion:
-                occlusion_map = dense_motion['occlusion_map']
-                output_dict['occlusion_map'] = occlusion_map
-            else:
-                occlusion_map = None
+            # if 'occlusion_map' in dense_motion:
+            #     occlusion_map = dense_motion['occlusion_map']
+            #     output_dict['occlusion_map'] = occlusion_map
+            # else:
+            #     occlusion_map = None
             deformation = dense_motion['deformation']
 
         torch.cuda.empty_cache()
@@ -107,7 +107,7 @@ class OcclusionAwareGenerator(nn.Module):
         for i in range(len(self.up_blocks)):
             out = self.up_blocks[i](out)
         out = self.final(out)
-        out = F.sigmoid(out)
+        out = torch.sigmoid(out)
 
         out = F.interpolate(out,scale_factor=0.5)
         output_dict["prediction"] = out
