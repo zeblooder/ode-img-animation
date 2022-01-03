@@ -88,7 +88,7 @@ def animate(config, generator, kp_detector, checkpoint, log_dir, dataset):
                 out['kp_source'] = kp_source
                 out['kp_norm'] = kp_norm
 
-                del out['sparse_deformed']
+                # del out['sparse_deformed']
 
                 predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
 
