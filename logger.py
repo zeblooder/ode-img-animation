@@ -43,9 +43,12 @@ class Logger:
     def save_cpk(self, emergent=False):
         cpk = {k: v.state_dict() for k, v in self.models.items()}
         cpk['epoch'] = self.epoch
-        cpk_path = os.path.join(self.cpk_dir, '%s-checkpoint.pth.tar' % str(self.epoch).zfill(self.zfill_num)) 
+        cpk_path = os.path.join(self.cpk_dir, '%s-checkpoint.pth.tar' % str(self.epoch).zfill(self.zfill_num))
+        old_cpk_path = os.path.join(self.cpk_dir, '%s-checkpoint.pth.tar' % str(self.epoch-1).zfill(self.zfill_num))
         if not (os.path.exists(cpk_path) and emergent):
             torch.save(cpk, cpk_path)
+        if os.path.exists(old_cpk_path) and (self.epoch) % self.checkpoint_freq != 0:
+            os.remove(old_cpk_path)
 
     @staticmethod
     def load_cpk(checkpoint_path, generator=None, discriminator=None, kp_detector=None,
@@ -89,8 +92,8 @@ class Logger:
     def log_epoch(self, epoch, models, inp, out):
         self.epoch = epoch
         self.models = models
-        if (self.epoch + 1) % self.checkpoint_freq == 0:
-            self.save_cpk()
+        # if (self.epoch + 1) % self.checkpoint_freq == 0:
+        self.save_cpk()
         self.log_scores(self.names)
         self.visualize_rec(inp, out)
 
