@@ -166,7 +166,6 @@ def makedirs(dirname):
 class ODENet(nn.Module):
     def __init__(self):
         super(ODENet, self).__init__()
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         # downsampling_layers = [
         #     nn.Conv2d(1, 64, 3, 1),
         #     norm(64),
@@ -179,7 +178,7 @@ class ODENet(nn.Module):
         feature_layers = [ODEBlock(ODEfunc(64))]
         # fc_layers = [norm(64), nn.ReLU(inplace=True), nn.AdaptiveAvgPool2d((1, 1)), (64,1,3)]
 
-        self.model = nn.Sequential(*feature_layers).to(device)
+        self.model = nn.Sequential(*feature_layers)
 
     def forward(self, x):
         return self.model(x)
