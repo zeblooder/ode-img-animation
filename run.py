@@ -7,7 +7,9 @@ import yaml
 from argparse import ArgumentParser
 from time import gmtime, strftime
 from shutil import copy
-
+os.environ['CUDA_VISIBLE_DEVICES']='0,1'
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 from frames_dataset import FramesDataset
 
 from modules.generator import OcclusionAwareGenerator
@@ -37,7 +39,7 @@ if __name__ == "__main__":
 
     opt = parser.parse_args()
     with open(opt.config) as f:
-        config = yaml.load(f)
+        config = yaml.safe_load(f)
 
     if opt.checkpoint is not None:
         log_dir = os.path.join(*os.path.split(opt.checkpoint)[:-1])
