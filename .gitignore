@@ -8,3 +8,4 @@ build
 *.egg
 /data
 /log
+checkpoint/
