@@ -2,57 +2,19 @@ import matplotlib
 
 matplotlib.use('Agg')
 import os, sys
-import yaml
-from argparse import ArgumentParser
 from tqdm import tqdm
 
 import imageio
 import numpy as np
 from skimage.transform import resize
-from skimage import img_as_ubyte
 import torch
 from sync_batchnorm import DataParallelWithCallback
+from logger import Logger, Visualizer
+from torch.utils.data import DataLoader
 
-from modules.generator import OcclusionAwareGenerator
-from modules.keypoint_detector import KPDetector
 from animate import normalize_kp
-from scipy.spatial import ConvexHull
-
+from metrics import evaluator
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,5,7'
-if sys.version_info[0] < 3:
-    raise Exception("You must use Python 3 or higher. Recommended version is Python 3.7")
-
-def load_checkpoints(config_path, checkpoint_path, cpu=False):
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-
-    generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
-                                        **config['model_params']['common_params'])
-    if not cpu:
-        generator.cuda()
-
-    kp_detector = KPDetector(**config['model_params']['kp_detector_params'],
-                             **config['model_params']['common_params'])
-    if not cpu:
-        kp_detector.cuda()
-
-    if cpu:
-        checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-    else:
-        checkpoint = torch.load(checkpoint_path)
-
-    generator.load_state_dict(checkpoint['generator'])
-    kp_detector.load_state_dict(checkpoint['kp_detector'])
-
-    if not cpu:
-        generator = DataParallelWithCallback(generator)
-        kp_detector = DataParallelWithCallback(kp_detector)
-
-    generator.eval()
-    kp_detector.eval()
-
-    return generator, kp_detector
-
 
 def make_animation(source_image, driving_video, generator, kp_detector, relative=True, adapt_movement_scale=True,
                    cpu=False):
@@ -61,7 +23,7 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
         source = torch.tensor(source_image[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
         if not cpu:
             source = source.cuda()
-        driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 4, 1, 2, 3)
+        driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 2, 1, 3, 4)
         kp_source = kp_detector(source)
         kp_driving_initial = kp_detector(driving[:, :, 0])
 
@@ -75,63 +37,48 @@ def make_animation(source_image, driving_video, generator, kp_detector, relative
             #                        use_relative_jacobian=relative, adapt_movement_scale=adapt_movement_scale)
             out = generator(source, kp_source=kp_source, kp_driving=kp_driving)
 
-            predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
+            predictions.append(out['prediction'].data.cpu().numpy()[0])
     return predictions
 
-def gen_video(args):
-    source_image = imageio.imread(args.source_image)
-    reader = imageio.get_reader(args.driving_video)
+def video2imgLst(video,transpose=True):
+    reader = imageio.get_reader(video)
     fps = reader.get_meta_data()['fps']
-    driving_video = []
+    imgLst = []
     try:
         for im in reader:
-            driving_video.append(im)
+            imgLst.append(im)
     except RuntimeError:
         pass
     reader.close()
+    if transpose:
+        imgLst = [resize(frame, (256, 256))[..., :3].transpose(2,0,1) for frame in imgLst]
+    else:
+        imgLst = [resize(frame, (256, 256))[..., :3] for frame in imgLst]
+    return imgLst[:2]
 
+def gen_video(source_image,driving_video,generator,kp_detector,relative=True, adapt_scale=True, cpu=False):
+    driving_video=video2imgLst(driving_video)
     source_image = resize(source_image, (256, 256))[..., :3]
-    driving_video = [resize(frame, (256, 256))[..., :3] for frame in driving_video]
-    generator, kp_detector = load_checkpoints(config_path=args.config, checkpoint_path=args.checkpoint, cpu=args.cpu)
-
-    predictions = make_animation(source_image, driving_video, generator, kp_detector, relative=args.relative,
-                                     adapt_movement_scale=args.adapt_scale, cpu=args.cpu)
+    predictions = make_animation(source_image, driving_video, generator, kp_detector, relative=relative,
+                                     adapt_movement_scale=adapt_scale, cpu=cpu)
     return driving_video, predictions
 
-def test(src_video,pred_video,metrics_lst=[]):
-    assert len(src_video)==len(pred_video)
-    length=len(src_video)
-    metrics=[0]*len(metrics_lst)
-    for src_frame, pred_frame in zip(src_video,pred_video):
-        metrics=[metric_func[metric](src_frame,pred_frame) for metric in metrics_lst]
-    metrics=[data/length for data in metrics]
-    return metrics
+def performance(generator, kp_detector, dataset, metrics,source_image=None):
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--checkpoint", default='vox-cpk.pth.tar', help="path to checkpoint to restore")
+    if source_image is None:
+        rand_video = dataset.__getitem__(np.random.randint(len(dataset)))['video']
+        source_image = rand_video[:,np.random.randint(rand_video.shape[1]),:,:]
+    else:
+        source_image = imageio.imread(source_image)
+    if torch.cuda.is_available():
+        generator = DataParallelWithCallback(generator)
+        kp_detector = DataParallelWithCallback(kp_detector)
 
-    parser.add_argument("--source_image", default='sup-mat/source.png', help="path to source image")
-    parser.add_argument("--driving_video", default='sup-mat/source.png', help="path to driving video")
-    parser.add_argument("--result_video", default='result.mp4', help="path to output")
+    generator.eval()
+    kp_detector.eval()
+    e=evaluator(kp_detector,metrics,len(dataset))
 
-    parser.add_argument("--relative", dest="relative", action="store_true",
-                        help="use relative or absolute keypoint coordinates")
-    parser.add_argument("--adapt_scale", dest="adapt_scale", action="store_true",
-                        help="adapt movement scale based on convex hull of keypoints")
-
-    parser.add_argument("--find_best_frame", dest="find_best_frame", action="store_true",
-                        help="Generate from the frame that is the most alligned with source. (Only for faces, requires face_aligment lib)")
-
-    parser.add_argument("--best_frame", dest="best_frame", type=int, default=None,
-                        help="Set frame to start from.")
-
-    parser.add_argument("--cpu", dest="cpu", action="store_true", help="cpu mode.")
-
-    parser.set_defaults(relative=False)
-    parser.set_defaults(adapt_scale=False)
-
-    opt = parser.parse_args()
-    src, pred = gen_video(opt)
-    test(src,pred)
+    for it, x in tqdm(enumerate(dataset.videos)):
+        src, pred=gen_video(source_image,os.path.join(dataset.root_dir,x),generator,kp_detector)
+        e.evaluate(src,pred)
+    e.get_res_pd().to_csv('1.csv')
