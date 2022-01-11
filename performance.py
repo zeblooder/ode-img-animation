@@ -21,7 +21,7 @@ def video2imgLst(video):
     return imgLst
 
 
-def performance(generator, kp_detector, dataset, metrics, source_image=None):
+def performance(generator, kp_detector, dataset, metrics, result_table,source_image=None):
     if source_image is None:
         rand_video = dataset.__getitem__(np.random.randint(len(dataset)))['video']
         source_image = rand_video[:, np.random.randint(rand_video.shape[1]), :, :]
@@ -40,4 +40,4 @@ def performance(generator, kp_detector, dataset, metrics, source_image=None):
     for it, x in tqdm(enumerate(dataset.videos)):
         driving_img_lst = video2imgLst(os.path.join(dataset.root_dir, x))
         e.evaluate(source_image, driving_img_lst)
-    e.save_res()
+    e.save_res(result_table)

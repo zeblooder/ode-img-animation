@@ -37,6 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
     parser.add_argument("--metrics", default="0", type=lambda x: list(map(str, x.split(','))),
                         help="Names of the metrics comma separated.")
+    parser.add_argument("--result_table", default='result.csv', help="path to output")
     parser.set_defaults(verbose=False)
 
     opt = parser.parse_args()
@@ -91,4 +92,4 @@ if __name__ == "__main__":
         animate(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'evaluation':
         print("Evaluation...")
-        performance(generator, kp_detector, dataset, opt.metrics)
+        performance(generator, kp_detector, dataset, opt.metrics, opt.result_table)

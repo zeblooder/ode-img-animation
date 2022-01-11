@@ -112,5 +112,5 @@ class evaluator:
         df = df.append(df.mean(axis=0), ignore_index=True)
         return df
 
-    def save_res(self, filename='1.csv'):
+    def save_res(self, filename='result.csv'):
         self.get_res_pd().to_csv(filename)
