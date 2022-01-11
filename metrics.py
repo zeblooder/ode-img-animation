@@ -82,7 +82,7 @@ class evaluator:
         with torch.no_grad():
             self.result[self.video_cnt, self.AKDpos] = np.average(
                 np.sqrt(np.sum((kp_driving - kp_prediction) ** 2, axis=1)))
-
+            
     def evaluate(self, source_img, driving_video):
         length = len(driving_video)
         pred_video = []
@@ -93,7 +93,7 @@ class evaluator:
                 t = threading.Thread(target=self.metric_func[metric], args=(driving_frame, pred_frame,))
                 t.start()
                 t.join()
-            if not self.FIDpos is None:
+            if not self.AKDpos is None:
                 t = threading.Thread(target=self.AKD, args=(kp_driving, kp_prediction,))
                 t.start()
                 t.join()
