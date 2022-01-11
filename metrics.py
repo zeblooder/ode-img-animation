@@ -1,9 +1,11 @@
-import numpy as np
-from pytorch_msssim import MS_SSIM  # https://github.com/VainF/pytorch-msssim
-from ignite.metrics.gan import FID
-import lpips, torch
-import pandas as pd
 import threading
+
+import lpips
+import numpy as np
+import pandas as pd
+import torch
+from ignite.metrics.gan import FID
+from pytorch_msssim import MS_SSIM  # https://github.com/VainF/pytorch-msssim
 from tqdm import tqdm
 
 
@@ -82,7 +84,7 @@ class evaluator:
         with torch.no_grad():
             self.result[self.video_cnt, self.AKDpos] = np.average(
                 np.sqrt(np.sum((kp_driving - kp_prediction) ** 2, axis=1)))
-            
+
     def evaluate(self, source_img, driving_video):
         length = len(driving_video)
         pred_video = []
