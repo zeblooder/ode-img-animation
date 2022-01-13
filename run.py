@@ -96,4 +96,5 @@ if __name__ == "__main__":
         animate(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'evaluation':
         print("Evaluation...")
-        performance(generator, kp_detector, dataset, opt.metrics, opt.result_table, opt.specified_source)
+        performance(generator, kp_detector, opt.checkpoint, dataset, opt.metrics, opt.result_table,
+                    opt.specified_source)

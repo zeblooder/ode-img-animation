@@ -99,12 +99,14 @@ class evaluator:
                 t = threading.Thread(target=self.AKD, args=(kp_driving, kp_prediction,))
                 t.start()
                 t.join()
+            torch.cuda.empty_cache()
         self.result[self.video_cnt] /= length
         if not self.FIDpos is None:
             t = threading.Thread(target=self.FID, args=(driving_video, pred_video,))
             t.start()
             t.join()
         self.video_cnt += 1
+        torch.cuda.empty_cache()
 
     def get_res_list(self):
         return [res / self.video_cnt for res in self.result]

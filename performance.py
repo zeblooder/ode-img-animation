@@ -4,7 +4,23 @@ import imageio
 import numpy as np
 import torch
 from skimage.transform import resize
+
 from metrics import evaluator
+from sync_batchnorm import DataParallelWithCallback
+
+
+def load_checkpoints(generator, kp_detector, checkpoint_path):
+    kp_detector.cuda()
+    checkpoint = torch.load(checkpoint_path)
+
+    generator.load_state_dict(checkpoint['generator'])
+    kp_detector.load_state_dict(checkpoint['kp_detector'])
+
+    generator = DataParallelWithCallback(generator)
+    kp_detector = DataParallelWithCallback(kp_detector)
+
+    generator.eval()
+    kp_detector.eval()
 
 
 def video2imgLst(video):
@@ -18,10 +34,11 @@ def video2imgLst(video):
         pass
     reader.close()
     imgLst = [resize(frame, (256, 256))[..., :3].transpose(2, 0, 1) for frame in imgLst]
-    return imgLst[:2]
+    return imgLst
 
 
-def performance(generator, kp_detector, dataset, metrics, result_table, specified_source, source_image=None):
+def performance(generator, kp_detector, checkpoint_path, dataset, metrics, result_table, specified_source,
+                source_image=None):
     new_dataset = dataset.videos
     if specified_source:
         source_video_index = 0
@@ -36,19 +53,12 @@ def performance(generator, kp_detector, dataset, metrics, result_table, specifie
         source_image = rand_video[:, source_frame_index, :, :]
         new_dataset.pop(source_video_index)
     else:
-        source_image = imageio.imread(source_image)
+        source_image = resize(imageio.imread(source_image), (256, 256)).transpose([2, 0, 1])
 
-    if torch.cuda.is_available():
-        # generator = DataParallelWithCallback(generator)
-        generator = generator.cuda()
-        # kp_detector = DatarallelWithCallback(generator)
-        kp_detector = kp_detector.cuda()
-
-    generator.eval()
-    kp_detector.eval()
+    load_checkpoints(generator, kp_detector, checkpoint_path)
     e = evaluator(kp_detector, generator, metrics, len(new_dataset))
 
-    for it, x in enumerate(new_dataset[:2]):
+    for x in new_dataset:
         driving_img_lst = video2imgLst(os.path.join(dataset.root_dir, x))
         e.evaluate(source_image, driving_img_lst)
     e.save_res(result_table)
