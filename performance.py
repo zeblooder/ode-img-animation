@@ -4,6 +4,7 @@ import imageio
 import numpy as np
 import torch
 from skimage.transform import resize
+from tqdm import tqdm
 
 from metrics import evaluator
 from sync_batchnorm import DataParallelWithCallback
@@ -38,7 +39,7 @@ def video2imgLst(video):
 
 
 def performance(algorithm, generator, kp_detector, checkpoint_path, dataset, metrics, result_table, specified_source,
-                source_image=None):
+                check_freq=None, source_image=None):
     new_dataset = dataset.videos
     if specified_source:
         source_video_index = 0
@@ -56,9 +57,11 @@ def performance(algorithm, generator, kp_detector, checkpoint_path, dataset, met
         source_image = resize(imageio.imread(source_image), (256, 256)).transpose([2, 0, 1])
 
     load_checkpoints(generator, kp_detector, checkpoint_path)
-    e = evaluator(kp_detector, generator, metrics, len(new_dataset))
+    e = evaluator(kp_detector, generator, metrics, new_dataset)
+    check_freq = int(len(new_dataset) / 5) if check_freq is None else check_freq
 
-    for x in new_dataset:
+    for it, x in enumerate(tqdm(new_dataset)):
         driving_img_lst = video2imgLst(os.path.join(dataset.root_dir, x))
         e.evaluate(source_image, driving_img_lst)
-    e.save_res(result_table)
+        if it % check_freq == 0:
+            e.save_res(result_table)

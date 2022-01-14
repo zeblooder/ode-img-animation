@@ -6,11 +6,10 @@ import pandas as pd
 import torch
 from ignite.metrics.gan import FID
 from pytorch_msssim import MS_SSIM  # https://github.com/VainF/pytorch-msssim
-from tqdm import tqdm
 
 
 class evaluator:
-    def __init__(self, kp_detector, generator, metrics_lst, size):
+    def __init__(self, kp_detector, generator, metrics_lst, dataset):
         self.kp_detector = kp_detector
         self.generator = generator
         self.loss_fn = lpips.LPIPS(net='vgg', verbose=False)
@@ -25,8 +24,11 @@ class evaluator:
             'FID': self._FID,
             'AKD': self._AKD
         }
+        self.dataset = dataset
         self.video_cnt = 0
-        self.result = np.zeros([size, len(metrics_lst)])
+        self.result = np.zeros([len(dataset), len(metrics_lst)])
+        self.df = pd.DataFrame(self.result, columns=self.metrics_lst)
+        self.df['filename'] = self.dataset
         self.metric_index = {v: k for k, v in dict(enumerate(metrics_lst)).items()}
         self.FIDpos = self.metrics_lst.index("FID") if "FID" in self.metrics_lst else None
         self.AKDpos = self.metrics_lst.index("AKD") if "AKD" in self.metrics_lst else None
@@ -88,7 +90,7 @@ class evaluator:
     def evaluate(self, source_img, driving_video):
         length = len(driving_video)
         pred_video = []
-        for driving_frame in tqdm(driving_video):
+        for driving_frame in driving_video:
             pred_frame, kp_driving, kp_prediction = self.generate(source_img, driving_frame)
             pred_video.append(pred_frame)
             for metric in self.metrics_lst:
@@ -112,9 +114,9 @@ class evaluator:
         return [res / self.video_cnt for res in self.result]
 
     def get_res_pd(self):
-        df = pd.DataFrame(self.result, columns=self.metrics_lst)
-        df = df.append(df.mean(axis=0), ignore_index=True)
+        self.df[self.metrics_lst] = self.result
+        df = self.df.append(self.df.mean(axis=0), ignore_index=True)
         return df
 
-    def save_res(self, filename='result.csv'):
+    def save_res(self, filename):
         self.get_res_pd().to_csv(filename)
