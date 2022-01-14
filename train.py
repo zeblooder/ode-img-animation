@@ -1,10 +1,9 @@
 from tqdm import trange,tqdm
-import torch
+import torch, importlib
 
 from torch.utils.data import DataLoader
 
 from logger import Logger
-from modules.model import GeneratorFullModel, DiscriminatorFullModel
 
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -13,7 +12,9 @@ from sync_batchnorm import DataParallelWithCallback
 from frames_dataset import DatasetRepeater
 
 
-def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
+def train(algorithm, config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
+    Algo = importlib.import_module("packages." + algorithm)
+
     train_params = config['train_params']
 
     optimizer_generator = torch.optim.Adam(generator.parameters(), lr=train_params['lr_generator'], betas=(0.5, 0.999))
@@ -38,8 +39,8 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
         dataset = DatasetRepeater(dataset, train_params['num_repeats'])
     dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
     # print(len(dataset))
-    generator_full = GeneratorFullModel(kp_detector, generator, discriminator, train_params)
-    discriminator_full = DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
+    generator_full = Algo.model.GeneratorFullModel(kp_detector, generator, discriminator, train_params)
+    discriminator_full = Algo.model.DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
 
     if torch.cuda.is_available():
         generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)

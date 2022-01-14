@@ -1,7 +1,7 @@
 from torch import nn
 import torch
 import torch.nn.functional as F
-from modules.util import AntiAliasInterpolation2d, make_coordinate_grid
+from .util import AntiAliasInterpolation2d, make_coordinate_grid
 from torchvision import models
 import numpy as np
 from torch.autograd import grad
@@ -90,7 +90,7 @@ class Transform:
         grid = make_coordinate_grid(frame.shape[2:], type=frame.type()).unsqueeze(0)
         grid = grid.view(1, frame.shape[2] * frame.shape[3], 2)
         grid = self.warp_coordinates(grid).view(self.bs, frame.shape[2], frame.shape[3], 2)
-        return F.grid_sample(frame, grid, padding_mode="reflection",align_corners=True)
+        return F.grid_sample(frame, grid, padding_mode="reflection")
 
     def warp_coordinates(self, coordinates):
         theta = self.theta.type(coordinates.type())
@@ -171,7 +171,28 @@ class GeneratorFullModel(torch.nn.Module):
                     value_total += self.loss_weights['perceptual'][i] * value
                 loss_values['perceptual'] = value_total
 
-        if self.loss_weights['equivariance_value']!= 0:
+        if self.loss_weights['generator_gan'] != 0:
+            discriminator_maps_generated = self.discriminator(pyramide_generated, kp=detach_kp(kp_driving))
+            discriminator_maps_real = self.discriminator(pyramide_real, kp=detach_kp(kp_driving))
+            value_total = 0
+            for scale in self.disc_scales:
+                key = 'prediction_map_%s' % scale
+                value = ((1 - discriminator_maps_generated[key]) ** 2).mean()
+                value_total += self.loss_weights['generator_gan'] * value
+            loss_values['gen_gan'] = value_total
+
+            if sum(self.loss_weights['feature_matching']) != 0:
+                value_total = 0
+                for scale in self.disc_scales:
+                    key = 'feature_maps_%s' % scale
+                    for i, (a, b) in enumerate(zip(discriminator_maps_real[key], discriminator_maps_generated[key])):
+                        if self.loss_weights['feature_matching'][i] == 0:
+                            continue
+                        value = torch.abs(a - b).mean()
+                        value_total += self.loss_weights['feature_matching'][i] * value
+                    loss_values['feature_matching'] = value_total
+
+        if (self.loss_weights['equivariance_value'] + self.loss_weights['equivariance_jacobian']) != 0:
             transform = Transform(x['driving'].shape[0], **self.train_params['transform_params'])
             transformed_frame = transform.transform_frame(x['driving'])
             transformed_kp = self.kp_extractor(transformed_frame)
@@ -183,6 +204,20 @@ class GeneratorFullModel(torch.nn.Module):
             if self.loss_weights['equivariance_value'] != 0:
                 value = torch.abs(kp_driving['value'] - transform.warp_coordinates(transformed_kp['value'])).mean()
                 loss_values['equivariance_value'] = self.loss_weights['equivariance_value'] * value
+
+            ## jacobian loss part
+            if self.loss_weights['equivariance_jacobian'] != 0:
+                jacobian_transformed = torch.matmul(transform.jacobian(transformed_kp['value']),
+                                                    transformed_kp['jacobian'])
+
+                normed_driving = torch.inverse(kp_driving['jacobian'])
+                normed_transformed = jacobian_transformed
+                value = torch.matmul(normed_driving, normed_transformed)
+
+                eye = torch.eye(2).view(1, 1, 2, 2).type(value.type())
+
+                value = torch.abs(eye - value).mean()
+                loss_values['equivariance_jacobian'] = self.loss_weights['equivariance_jacobian'] * value
 
         return loss_values, generated
 

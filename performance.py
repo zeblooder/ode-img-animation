@@ -37,7 +37,7 @@ def video2imgLst(video):
     return imgLst
 
 
-def performance(generator, kp_detector, checkpoint_path, dataset, metrics, result_table, specified_source,
+def performance(algorithm, generator, kp_detector, checkpoint_path, dataset, metrics, result_table, specified_source,
                 source_image=None):
     new_dataset = dataset.videos
     if specified_source:

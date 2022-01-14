@@ -8,7 +8,7 @@ import imageio
 from sync_batchnorm import DataParallelWithCallback
 
 
-def reconstruction(config, generator, kp_detector, checkpoint, log_dir, dataset):
+def reconstruction(algorithm, config, generator, kp_detector, checkpoint, log_dir, dataset):
     png_dir = os.path.join(log_dir, 'reconstruction/png')
     log_dir = os.path.join(log_dir, 'reconstruction')
 

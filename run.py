@@ -7,15 +7,12 @@ import yaml
 from argparse import ArgumentParser
 from time import gmtime, strftime
 from shutil import copy
+import importlib
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 from frames_dataset import FramesDataset
-
-from modules.generator import OcclusionAwareGenerator
-from modules.discriminator import MultiScaleDiscriminator
-from modules.keypoint_detector import KPDetector
 
 import torch
 
@@ -32,6 +29,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "animate", "evaluation"])
+    parser.add_argument("--algo", default="gaussian", choices=["FOMM", "bilinear", "gaussian"])
     parser.add_argument("--log_dir", default='log', help="path to log into")
     parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
     parser.add_argument("--device_ids", default="0", type=lambda x: list(map(int, x.split(','))),
@@ -45,6 +43,9 @@ if __name__ == "__main__":
     parser.set_defaults(verbose=False)
 
     opt = parser.parse_args()
+
+    Algo = importlib.import_module("packages."+opt.algo)
+
     with open(opt.config) as f:
         config = yaml.safe_load(f)
 
@@ -54,7 +55,7 @@ if __name__ == "__main__":
         log_dir = os.path.join(opt.log_dir, os.path.basename(opt.config).split('.')[0])
         log_dir += ' ' + strftime("%d_%m_%y_%H.%M.%S", gmtime())
 
-    generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
+    generator = Algo.generator.OcclusionAwareGenerator(**config['model_params']['generator_params'],
                                         **config['model_params']['common_params'])
 
     if torch.cuda.is_available():
@@ -62,14 +63,14 @@ if __name__ == "__main__":
     if opt.verbose:
         print(generator)
 
-    discriminator = MultiScaleDiscriminator(**config['model_params']['discriminator_params'],
+    discriminator = Algo.discriminator.MultiScaleDiscriminator(**config['model_params']['discriminator_params'],
                                             **config['model_params']['common_params'])
     if torch.cuda.is_available():
         discriminator.to(opt.device_ids[0])
     if opt.verbose:
         print(discriminator)
 
-    kp_detector = KPDetector(**config['model_params']['kp_detector_params'],
+    kp_detector = Algo.keypoint_detector.KPDetector(**config['model_params']['kp_detector_params'],
                              **config['model_params']['common_params'])
 
     if torch.cuda.is_available():
@@ -85,16 +86,18 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(log_dir, os.path.basename(opt.config))):
         copy(opt.config, log_dir)
 
+    print("Target model: "+str(Algo))
+
     if opt.mode == 'train':
         print("Training...")
-        train(config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
+        train(opt.algo, config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
     elif opt.mode == 'reconstruction':
         print("Reconstruction...")
-        reconstruction(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
+        reconstruction(opt.algo, config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'animate':
         print("Animate...")
-        animate(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
+        animate(opt.algo, config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'evaluation':
         print("Evaluation...")
-        performance(generator, kp_detector, opt.checkpoint, dataset, opt.metrics, opt.result_table,
+        performance(opt.algo, generator, kp_detector, opt.checkpoint, dataset, opt.metrics, opt.result_table,
                     opt.specified_source)

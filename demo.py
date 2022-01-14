@@ -1,7 +1,7 @@
 import matplotlib
 
 matplotlib.use('Agg')
-import os, sys
+import os, sys, importlib
 import yaml
 from argparse import ArgumentParser
 from tqdm import tqdm
@@ -13,8 +13,6 @@ from skimage import img_as_ubyte
 import torch
 from sync_batchnorm import DataParallelWithCallback
 
-from modules.generator import OcclusionAwareGenerator
-from modules.keypoint_detector import KPDetector
 from animate import normalize_kp
 from scipy.spatial import ConvexHull
 
@@ -27,12 +25,12 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
+    generator = Algo.generator.OcclusionAwareGenerator(**config['model_params']['generator_params'],
                                         **config['model_params']['common_params'])
     if not cpu:
         generator.cuda()
 
-    kp_detector = KPDetector(**config['model_params']['kp_detector_params'],
+    kp_detector = Algo.keypoint_detector.KPDetector(**config['model_params']['kp_detector_params'],
                              **config['model_params']['common_params'])
     if not cpu:
         kp_detector.cuda()
@@ -127,11 +125,13 @@ if __name__ == "__main__":
                         help="Set frame to start from.")
 
     parser.add_argument("--cpu", dest="cpu", action="store_true", help="cpu mode.")
+    parser.add_argument("--algo", default="gaussian", choices=["FOMM", "bilinear", "gaussian"])
 
     parser.set_defaults(relative=False)
     parser.set_defaults(adapt_scale=False)
 
     opt = parser.parse_args()
+    Algo = importlib.import_module("packages." + opt.algo)
 
     source_image = imageio.imread(opt.source_image)
     reader = imageio.get_reader(opt.driving_video)
