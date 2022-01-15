@@ -1,4 +1,5 @@
-import threading, math
+import math
+import threading
 
 import lpips
 import numpy as np
@@ -55,11 +56,11 @@ class evaluator:
     def PSNR(self, original, contrast):
         mse = np.mean((original - contrast) ** 2)
         if mse == 0:
-            PSNR = 100
+            res = 100
         else:
             PIXEL_MAX = 255.0
-            PSNR = 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
-        self.result[self.video_cnt, self.metric_index['PSNR']] = PSNR
+            res = 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
+        self.result[self.video_cnt, self.metric_index['PSNR']] += res
 
     def MS_SSIM(self, src, pred):
         self.result[self.video_cnt, self.metric_index['MS-/SSIM']] = float(
