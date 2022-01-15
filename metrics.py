@@ -122,8 +122,8 @@ class evaluator:
     def get_res_pd(self, mean=False):
         self.df[self.metrics_lst] = self.result
         if mean:
-            df = self.df.append(self.df.mean(axis=0), ignore_index=True)
-        return df
+            self.df = self.df.append(self.df.mean(axis=0), ignore_index=True)
+        return self.df
 
     def save_res(self, filename, mean):
         self.get_res_pd(mean).to_csv(filename)
