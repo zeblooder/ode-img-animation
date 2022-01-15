@@ -1,4 +1,4 @@
-import threading
+import threading, math
 
 import lpips
 import numpy as np
@@ -19,7 +19,7 @@ class evaluator:
         self.metric_func = {
             'l1': self.L1_norm,
             'LPIPS': self.LPIPS,
-            'PSNR': self.MSE,
+            'PSNR': self.PSNR,
             'MS-/SSIM': self.MS_SSIM,
             'FID': self._FID,
             'AKD': self._AKD
@@ -52,8 +52,14 @@ class evaluator:
                 self.loss_fn.forward(torch.tensor(src, dtype=torch.float32),
                                      torch.tensor(pred, dtype=torch.float32)))
 
-    def MSE(self, src, pred):
-        self.result[self.video_cnt, self.metric_index['PSNR']] = np.sum((src - pred) ** 2) / np.size(src)
+    def PSNR(self, original, contrast):
+        mse = np.mean((original - contrast) ** 2)
+        if mse == 0:
+            PSNR = 100
+        else:
+            PIXEL_MAX = 255.0
+            PSNR = 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
+        self.result[self.video_cnt, self.metric_index['PSNR']] = PSNR
 
     def MS_SSIM(self, src, pred):
         self.result[self.video_cnt, self.metric_index['MS-/SSIM']] = float(
@@ -113,10 +119,11 @@ class evaluator:
     def get_res_list(self):
         return [res / self.video_cnt for res in self.result]
 
-    def get_res_pd(self):
+    def get_res_pd(self, mean=False):
         self.df[self.metrics_lst] = self.result
-        df = self.df.append(self.df.mean(axis=0), ignore_index=True)
+        if mean:
+            df = self.df.append(self.df.mean(axis=0), ignore_index=True)
         return df
 
-    def save_res(self, filename):
-        self.get_res_pd().to_csv(filename)
+    def save_res(self, filename, mean):
+        self.get_res_pd(mean).to_csv(filename)

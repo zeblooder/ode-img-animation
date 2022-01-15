@@ -64,4 +64,5 @@ def performance(algorithm, generator, kp_detector, checkpoint_path, dataset, met
         driving_img_lst = video2imgLst(os.path.join(dataset.root_dir, x))
         e.evaluate(source_image, driving_img_lst)
         if it % check_freq == 0:
-            e.save_res(result_table)
+            e.save_res(result_table, False)
+    e.save_res(result_table, True)
