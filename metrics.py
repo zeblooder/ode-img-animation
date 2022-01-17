@@ -95,7 +95,8 @@ class evaluator:
                 np.sqrt(np.sum((kp_driving - kp_prediction) ** 2, axis=1)))
 
     def evaluate(self, driving_video):
-        source_img=driving_video.pop(driving_video[0])
+        source_img=driving_video[0]
+        driving_video.pop(0)
         length = len(driving_video)
         pred_video = []
         for driving_frame in driving_video:

@@ -88,6 +88,8 @@ class OcclusionAwareGenerator(nn.Module):
 
         torch.cuda.empty_cache()
 
+        if self.appearance_flow is not None:
+            F_app, flow_maps = self.appearance_flow(out) # F_{SD}
         # Transforming feature representation according to deformation and occlusion
         output_dict = {}
         if self.ode is not None:
@@ -95,10 +97,7 @@ class OcclusionAwareGenerator(nn.Module):
 
             out = self.deform_input(out, dense_motion) # F_{SD}
 
-        if self.appearance_flow is not None:
-            F_app, flow_maps = self.appearance_flow(out) # F_{SD}
-
-        out=torch.cat([out,F_app],dim=1)
+        out=torch.cat([out, F_app],dim=1)
 
         torch.cuda.empty_cache()
 

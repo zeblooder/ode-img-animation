@@ -40,11 +40,12 @@ def video2imgLst(video):
 
 def performance(generator, kp_detector, checkpoint_path, dataset, metrics, result_table,
                 check_freq=None):
+    video_list=dataset.videos
     load_checkpoints(generator, kp_detector, checkpoint_path)
     e = evaluator(kp_detector, generator, metrics, dataset)
-    check_freq = int(len(dataset) / 5) if check_freq is None else check_freq
+    check_freq = int(len(video_list) / 5) if check_freq is None else check_freq
 
-    for it, x in enumerate(tqdm(dataset)):
+    for it, x in enumerate(tqdm(video_list)):
         driving_img_lst = video2imgLst(os.path.join(dataset.root_dir, x))
         e.evaluate(driving_img_lst)
         if it % check_freq == 0:
