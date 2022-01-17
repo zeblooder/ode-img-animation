@@ -75,3 +75,8 @@ visualizer_params:
   kp_size: 5
   draw_border: True
   colormap: 'gist_rainbow'
+
+pretrained_paths:
+  FOMM: 'log/fashion-256 08_01_22_03.03.23/00000099-checkpoint.pth.tar'
+  gaussian: 'checkpoint/00000099-checkpoint.pth.tar'
+  bilinear: 'log/fashion-256 05_01_22_00.05.02/00000099-checkpoint.pth.tar'

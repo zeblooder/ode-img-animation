@@ -11,3 +11,4 @@ build
 checkpoint/
 *.csv
 *.mp4
+*.png
