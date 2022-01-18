@@ -51,7 +51,6 @@ def train(algorithm, config, generator, discriminator, kp_detector, checkpoint, 
     with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], checkpoint_freq=train_params['checkpoint_freq']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
             for x in tqdm(dataloader):
-                x = {key: x[key].cuda() if type(x[key])==type(x['source']) else x[key] for key in x}
                 losses_generator, generated = generator_full(x)
 
                 torch.cuda.empty_cache()

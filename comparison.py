@@ -55,14 +55,6 @@ def load_checkpoints(config_path, methods, cpu=False):
     return generator_dict, kp_detector_dict
 
 
-def create_image_column(images, draw_border=False):
-    if draw_border:
-        images = np.copy(images)
-        images[:, :, [0, -1]] = (1, 1, 1)
-        images[:, :, [0, -1]] = (1, 1, 1)
-    return np.concatenate(list(images), axis=0)
-
-
 def generate(generator, kp_detector, source, driving_frame):
     source_tensor = torch.tensor(source[np.newaxis].astype(np.float32)).cuda()
     with torch.no_grad():
