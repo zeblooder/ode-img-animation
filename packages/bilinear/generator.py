@@ -64,19 +64,19 @@ class OcclusionAwareGenerator(nn.Module):
 
     def forward(self, source_image, kp_driving, kp_source):
         # Transforming feature representation according to deformation and occlusion
-        # output_dict = {}
+        output_dict = {}
 
         if self.dense_motion_network is not None:
             dense_motion = self.dense_motion_network(source_image=source_image, kp_driving=kp_driving,
                                                      kp_source=kp_source)
-            # output_dict['mask'] = dense_motion['mask']
-            # output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
+            output_dict['mask'] = dense_motion['mask']
+            output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
 
-            # if 'occlusion_map' in dense_motion:
-            #     occlusion_map = dense_motion['occlusion_map']
-            #     output_dict['occlusion_map'] = occlusion_map
-            # else:
-            #     occlusion_map = None
+            if 'occlusion_map' in dense_motion:
+                occlusion_map = dense_motion['occlusion_map']
+                output_dict['occlusion_map'] = occlusion_map
+            else:
+                occlusion_map = None
             deformation = dense_motion['deformation']
 
         torch.cuda.empty_cache()
@@ -89,7 +89,7 @@ class OcclusionAwareGenerator(nn.Module):
         torch.cuda.empty_cache()
 
         # Transforming feature representation according to deformation and occlusion
-        output_dict = {}
+        ori_out = self.deform_input(out, deformation)  # F_{SD}
         if self.ode is not None:
             dense_motion = self.ode(deformation) # 求解ODE,返回F_{S->D} 1*64*64*2
 
@@ -98,7 +98,12 @@ class OcclusionAwareGenerator(nn.Module):
         if self.appearance_flow is not None:
             F_app, flow_maps = self.appearance_flow(out) # F_{SD}
 
-        out=torch.cat([out,F_app],dim=1)
+        if occlusion_map is not None:
+            if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
+                occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
+            F_app = F_app * occlusion_map
+            ori_out = ori_out * occlusion_map
+        out=torch.cat([ori_out, F_app],dim=1)
 
         torch.cuda.empty_cache()
 
@@ -109,7 +114,7 @@ class OcclusionAwareGenerator(nn.Module):
         out = self.final(out)
         out = torch.sigmoid(out)
 
-        out = F.interpolate(out,scale_factor=0.5)
+        out = F.interpolate(out,scale_factor=0.5,recompute_scale_factor=True)
         output_dict["prediction"] = out
 
         return output_dict
