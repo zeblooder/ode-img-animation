@@ -89,7 +89,6 @@ class OcclusionAwareGenerator(nn.Module):
         torch.cuda.empty_cache()
 
         # Transforming feature representation according to deformation and occlusion
-        ori_out = self.deform_input(out, deformation)  # F_{SD}
         if self.ode is not None:
             dense_motion = self.ode(deformation) # 求解ODE,返回F_{S->D} 1*64*64*2
 
@@ -102,8 +101,9 @@ class OcclusionAwareGenerator(nn.Module):
             if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
                 occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
             F_app = F_app * occlusion_map
-            ori_out = ori_out * occlusion_map
-        out=torch.cat([ori_out, F_app],dim=1)
+            out = out * occlusion_map
+
+        out=torch.cat([out,F_app],dim=1)
 
         torch.cuda.empty_cache()
 
