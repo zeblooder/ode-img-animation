@@ -72,7 +72,7 @@ class ConvColumn(nn.Module):
     def resample_image(self, img, flow):
         # output16 = self.resample16(img, flow)
         # output4 = self.resample4(img, flow)
-        output = F.grid_sample(img,flow.permute(0,2,3,1))
+        output = F.grid_sample(img,flow.permute(0,2,3,1),align_corners=True)
         outputs = torch.cat((output, output), 1)
         return outputs
 
