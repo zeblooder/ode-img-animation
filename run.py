@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "animate", "evaluation"])
-    parser.add_argument("--algo", default="gaussian", choices=["FOMM", "bilinear", "gaussian"])
+    parser.add_argument("--algo", default="gaussian", help="algorithm")
     parser.add_argument("--log_dir", default='log', help="path to log into")
     parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
     parser.add_argument("--device_ids", default="0", type=lambda x: list(map(int, x.split(','))),

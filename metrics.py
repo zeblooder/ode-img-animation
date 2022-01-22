@@ -29,7 +29,7 @@ class evaluator:
         self.video_cnt = 0
         self.result = np.zeros([len(dataset), len(metrics_lst)])
         self.df = pd.DataFrame(self.result, columns=self.metrics_lst)
-        self.df['filename'] = self.dataset
+        self.df['filename'] = self.dataset.videos
         self.metric_index = {v: k for k, v in dict(enumerate(metrics_lst)).items()}
         self.FIDpos = self.metrics_lst.index("FID") if "FID" in self.metrics_lst else None
         self.AKDpos = self.metrics_lst.index("AKD") if "AKD" in self.metrics_lst else None
