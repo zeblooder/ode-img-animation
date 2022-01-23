@@ -170,6 +170,8 @@ class GeneratorFullModel(torch.nn.Module):
                     value = torch.abs(x_vgg[i] - y_vgg[i].detach()).mean()
                     value_total += self.loss_weights['perceptual'][i] * value
                 loss_values['perceptual'] = value_total
+        
+        torch.cuda.empty_cache()
 
         if self.loss_weights['generator_gan'] != 0:
             discriminator_maps_generated = self.discriminator(pyramide_generated, kp=detach_kp(kp_driving))
@@ -191,6 +193,8 @@ class GeneratorFullModel(torch.nn.Module):
                         value = torch.abs(a - b).mean()
                         value_total += self.loss_weights['feature_matching'][i] * value
                     loss_values['feature_matching'] = value_total
+ 
+        torch.cuda.empty_cache()
 
         if (self.loss_weights['equivariance_value'] + self.loss_weights['equivariance_jacobian']) != 0:
             transform = Transform(x['driving'].shape[0], **self.train_params['transform_params'])

@@ -1,7 +1,7 @@
 import matplotlib
 
 matplotlib.use('Agg')
-import os, sys, importlib
+import sys, importlib
 import yaml
 from argparse import ArgumentParser
 from tqdm import tqdm
@@ -13,7 +13,6 @@ from skimage import img_as_ubyte
 import torch
 from sync_batchnorm import DataParallelWithCallback
 
-from animate import normalize_kp
 from scipy.spatial import ConvexHull
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,5,7'
@@ -26,12 +25,12 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
         config = yaml.safe_load(f)
 
     generator = Algo.generator.OcclusionAwareGenerator(**config['model_params']['generator_params'],
-                                        **config['model_params']['common_params'])
+                                                       **config['model_params']['common_params'])
     if not cpu:
         generator.cuda()
 
     kp_detector = Algo.keypoint_detector.KPDetector(**config['model_params']['kp_detector_params'],
-                             **config['model_params']['common_params'])
+                                                    **config['model_params']['common_params'])
     if not cpu:
         kp_detector.cuda()
 

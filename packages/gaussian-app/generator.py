@@ -1,11 +1,10 @@
-import torch
+import numpy as np
+import torch,sys
 from torch import nn
 import torch.nn.functional as F
 from .util import ResBlock2d, SameBlock2d, UpBlock2d, DownBlock2d
 from .dense_motion import DenseMotionNetwork
 from .odenet import ODENet
-
-
 class OcclusionAwareGenerator(nn.Module):
     """
     Generator that given source image and and keypoints try to transform image according to movement trajectories
@@ -25,7 +24,7 @@ class OcclusionAwareGenerator(nn.Module):
         self.ode = ODENet()
 
         self.first = SameBlock2d(num_channels, block_expansion, kernel_size=(7, 7), padding=(3, 3))
-
+        
         down_blocks = []
         for i in range(num_down_blocks):
             in_features = min(max_features, block_expansion * (2 ** i))
@@ -34,6 +33,7 @@ class OcclusionAwareGenerator(nn.Module):
         self.down_blocks = nn.ModuleList(down_blocks)
 
         up_blocks = []
+        num_down_blocks+=1
         for i in range(num_down_blocks):
             in_features = min(max_features, block_expansion * (2 ** (num_down_blocks - i)))
             out_features = min(max_features, block_expansion * (2 ** (num_down_blocks - i - 1)))
@@ -56,15 +56,9 @@ class OcclusionAwareGenerator(nn.Module):
             deformation = deformation.permute(0, 3, 1, 2)
             deformation = F.interpolate(deformation, size=(h, w), mode='bilinear')
             deformation = deformation.permute(0, 2, 3, 1)
-        return F.grid_sample(inp, deformation,align_corners=True)
+        return F.grid_sample(inp, deformation, align_corners=True)
 
     def forward(self, source_image, kp_driving, kp_source):
-        # Encoding (downsampling) part
-        out = self.first(source_image)
-        for i in range(len(self.down_blocks)):
-            out = self.down_blocks[i](out)
-        torch.cuda.empty_cache()
-
         # Transforming feature representation according to deformation and occlusion
         output_dict = {}
         if self.dense_motion_network is not None:
@@ -79,17 +73,28 @@ class OcclusionAwareGenerator(nn.Module):
             else:
                 occlusion_map = None
             deformation = dense_motion['deformation']
-            if self.ode is not None:
-                dense_motion = self.ode(deformation) # 求解ODE,返回F_{S->D} 1*64*64*2
+
+        torch.cuda.empty_cache()
+
+        # Encoding (downsampling) part, out是特征F_S
+        out = self.first(source_image)
+        for i in range(len(self.down_blocks)):
+            out = self.down_blocks[i](out)
+
+        torch.cuda.empty_cache()
+
+        # Transforming feature representation according to deformation and occlusion
+        ori_out = self.deform_input(out, deformation)  # F_{SD}
+        if self.ode is not None:
+            dense_motion = self.ode(deformation) # 求解ODE,返回F_{S->D} 1*64*64*2
 
             out = self.deform_input(out, dense_motion) # F_{SD}
 
-            if occlusion_map is not None:
-                if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
-                    occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
-                out = out * occlusion_map
-
-            output_dict["deformed"] = self.deform_input(source_image, deformation)
+        if occlusion_map is not None:
+            if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
+                occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
+        out=torch.cat([ori_out, out],dim=1) * occlusion_map
+        output_dict["deformed"] = self.deform_input(source_image, dense_motion)
         torch.cuda.empty_cache()
 
         # Decoding part
@@ -97,8 +102,8 @@ class OcclusionAwareGenerator(nn.Module):
         for i in range(len(self.up_blocks)):
             out = self.up_blocks[i](out)
         out = self.final(out)
-        out = F.sigmoid(out)
-
+        out = torch.sigmoid(out)
+        out = F.interpolate(out,scale_factor=0.5,recompute_scale_factor=True)
         output_dict["prediction"] = out
 
         return output_dict

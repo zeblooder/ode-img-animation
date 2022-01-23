@@ -1,15 +1,12 @@
-from tqdm import trange,tqdm
-import torch, importlib
-
-from torch.utils.data import DataLoader
-
-from logger import Logger
-
+import importlib
+import torch
 from torch.optim.lr_scheduler import MultiStepLR
-
-from sync_batchnorm import DataParallelWithCallback
+from torch.utils.data import DataLoader
+from tqdm import trange, tqdm
 
 from frames_dataset import DatasetRepeater
+from logger import Logger
+from sync_batchnorm import DataParallelWithCallback
 
 
 def train(algorithm, config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
@@ -18,8 +15,10 @@ def train(algorithm, config, generator, discriminator, kp_detector, checkpoint, 
     train_params = config['train_params']
 
     optimizer_generator = torch.optim.Adam(generator.parameters(), lr=train_params['lr_generator'], betas=(0.5, 0.999))
-    optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=train_params['lr_discriminator'], betas=(0.5, 0.999))
-    optimizer_kp_detector = torch.optim.Adam(kp_detector.parameters(), lr=train_params['lr_kp_detector'], betas=(0.5, 0.999))
+    optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=train_params['lr_discriminator'],
+                                               betas=(0.5, 0.999))
+    optimizer_kp_detector = torch.optim.Adam(kp_detector.parameters(), lr=train_params['lr_kp_detector'],
+                                             betas=(0.5, 0.999))
 
     if checkpoint is not None:
         start_epoch = Logger.load_cpk(checkpoint, generator, discriminator, kp_detector,
@@ -37,7 +36,8 @@ def train(algorithm, config, generator, discriminator, kp_detector, checkpoint, 
 
     if 'num_repeats' in train_params or train_params['num_repeats'] != 1:
         dataset = DatasetRepeater(dataset, train_params['num_repeats'])
-    dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
+    dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=4, drop_last=True,
+                            pin_memory=True)
     # print(len(dataset))
     generator_full = Algo.model.GeneratorFullModel(kp_detector, generator, discriminator, train_params)
     discriminator_full = Algo.model.DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
@@ -45,10 +45,11 @@ def train(algorithm, config, generator, discriminator, kp_detector, checkpoint, 
     if torch.cuda.is_available():
         generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)
         discriminator_full = DataParallelWithCallback(discriminator_full, device_ids=device_ids)
-        generator_full=generator_full.cuda()
-        discriminator_full=discriminator_full.cuda()
+        generator_full = generator_full.cuda()
+        discriminator_full = discriminator_full.cuda()
 
-    with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], checkpoint_freq=train_params['checkpoint_freq']) as logger:
+    with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'],
+                checkpoint_freq=train_params['checkpoint_freq']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
             for x in tqdm(dataloader):
                 losses_generator, generated = generator_full(x)

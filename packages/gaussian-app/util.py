@@ -243,3 +243,4 @@ class AntiAliasInterpolation2d(nn.Module):
         out = out[:, :, ::self.int_inv_scale, ::self.int_inv_scale]
 
         return out
+

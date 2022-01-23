@@ -6,8 +6,8 @@ from argparse import ArgumentParser
 import imageio
 import numpy as np
 import torch
-from tqdm import tqdm
 import yaml
+from tqdm import tqdm
 
 from frames_dataset import FramesDataset
 from sync_batchnorm import DataParallelWithCallback
@@ -48,11 +48,14 @@ def load_checkpoint(config_path, checkpoint_path, algo, cpu=False):
 def load_checkpoints(config_path, methods, cpu=False):
     with open(config_path) as f:
         config = yaml.safe_load(f)
-    generator_dict = {}
-    kp_detector_dict = {}
-    for m in methods:
-        generator_dict[m], kp_detector_dict[m] = load_checkpoint(config_path, config['pretrained_paths'][m], m, cpu)
-    return generator_dict, kp_detector_dict
+    if len(methods) == 1:
+        return load_checkpoint(config_path, config['pretrained_paths'][methods[0]], methods[0], cpu)
+    else:
+        generator_dict = {}
+        kp_detector_dict = {}
+        for m in methods:
+            generator_dict[m], kp_detector_dict[m] = load_checkpoint(config_path, config['pretrained_paths'][m], m, cpu)
+        return generator_dict, kp_detector_dict
 
 
 def generate(generator, kp_detector, source, driving_frame):
@@ -87,6 +90,62 @@ def random_img_pair(dataset):
         dest_frame_index) + '_' + '.png'
 
 
+def random_specified_num_img_pair(dataset, col, row, seed=0, source_index=0):
+    """
+    generate images for showing results in a table
+    """
+    random.seed(seed)
+    rand_list = random.sample(range(len(dataset)), row)
+    driving_video = dataset.__getitem__(rand_list[0])['video']
+    source_videos = [dataset.__getitem__(rand_list[i])['video'] for i in range(row)]
+    dest_frame_index = [i + 1 for i in sorted(random.sample(range(driving_video.shape[1] - 1), col))]
+    source_images = [source_videos[i][:, source_index, :, :] for i in range(row)]
+    driving_images = [driving_video[:, i, :, :] for i in dest_frame_index]
+    return source_images, driving_images
+
+
+def gen_tab_latex(col, row,method):
+    img = "\\includegraphics[width=20mm]{{image/chap04/experiment_src_driv/{}-{}.png}}"
+    ret = '\\begin{tabular}{ccccc}\n\\hline\n\\diagbox{Source}{Driving} &\n'
+    for i in range(col + 1):
+        if i != 0:
+            ret += img.format(method, str(i) + '-0') + ' &\n'
+        for j in range(row):
+            ret += img.format(method, str(i) + '-' + str(j + 1))
+            if j + 1 != row:
+                ret += ' &\n'
+            else:
+                ret += ' \\\\\n\\hline\n'
+    return ret + '\\end{tabular}'
+
+
+def gen_table(config, col=4, row=4, method='gaussian', seed=0):
+    with open(opt.config) as f:
+        config = yaml.safe_load(f)
+    dataset = FramesDataset(is_train=False, **config['dataset_params'])
+    source_images, driving_images = random_specified_num_img_pair(dataset, col, row, seed)
+    generator, kp_detector = load_checkpoints(opt.config, [method])
+    for j in range(col):
+        imageio.imsave("{}-0-{}.png".format(method, j + 1), (255*driving_images[j].transpose(1,2,0)).astype(np.uint8))
+    for i in range(row):
+        imageio.imsave("{}-{}-0.png".format(method, i + 1), (255*source_images[i].transpose(1,2,0)).astype(np.uint8))
+        for j in range(col):
+            imageio.imsave("{}-{}-{}.png".format(method, i + 1, j + 1),
+                           (255*generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1,2,0).astype(np.uint8))
+    return gen_tab_latex(col, row)
+
+
+def gen_compare2(opt):
+    with open(opt.config) as f:
+        config = yaml.safe_load(f)
+    dataset = FramesDataset(is_train=False, **config['dataset_params'])
+    generator_dict, kp_detector_dict = load_checkpoints(opt.config, opt.methods)
+    for i in tqdm(range(opt.num)):
+        source_image, dest_image, default_fname = random_img_pair(dataset)
+        image = visualize_comparison(generator_dict, kp_detector_dict, opt.methods, source_image, dest_image)
+        imageio.imsave(default_fname if opt.path is None else opt.path, image)
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", required=True, help="path to config")
@@ -97,11 +156,5 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
     parser.set_defaults(verbose=False)
     opt = parser.parse_args()
-    with open(opt.config) as f:
-        config = yaml.safe_load(f)
-    dataset = FramesDataset(is_train=False, **config['dataset_params'])
-    generator_dict, kp_detector_dict = load_checkpoints(opt.config, opt.methods)
-    for i in tqdm(range(opt.num)):
-        source_image, dest_image, default_fname = random_img_pair(dataset)
-        image = visualize_comparison(generator_dict, kp_detector_dict, opt.methods, source_image, dest_image)
-        imageio.imsave(default_fname if opt.path is None else opt.path, image)
+    for method in opt.methods:
+        print(gen_table(opt.config, 4, 4, method))
