@@ -1,7 +1,6 @@
 import os
 
 import imageio
-import numpy as np
 import torch
 from skimage.transform import resize
 from tqdm import tqdm
@@ -40,7 +39,7 @@ def video2imgLst(video):
 
 def performance(generator, kp_detector, checkpoint_path, dataset, metrics, result_table,
                 check_freq=None):
-    video_list=dataset.videos
+    video_list = dataset.videos
     load_checkpoints(generator, kp_detector, checkpoint_path)
     e = evaluator(kp_detector, generator, metrics, dataset)
     check_freq = int(len(video_list) / 5) if check_freq is None else check_freq

@@ -104,7 +104,7 @@ def random_specified_num_img_pair(dataset, col, row, seed=0, source_index=0):
     return source_images, driving_images
 
 
-def gen_tab_latex(col, row,method):
+def gen_tab_latex(col, row, method):
     img = "\\includegraphics[width=20mm]{{image/chap04/experiment_src_driv/{}-{}.png}}"
     ret = '\\begin{tabular}{ccccc}\n\\hline\n\\diagbox{Source}{Driving} &\n'
     for i in range(col + 1):
@@ -119,20 +119,19 @@ def gen_tab_latex(col, row,method):
     return ret + '\\end{tabular}'
 
 
-def gen_table(config, col=4, row=4, method='gaussian', seed=0):
-    with open(opt.config) as f:
-        config = yaml.safe_load(f)
-    dataset = FramesDataset(is_train=False, **config['dataset_params'])
+def gen_table(config, dataset, col=4, row=4, method='gaussian', seed=0):
     source_images, driving_images = random_specified_num_img_pair(dataset, col, row, seed)
     generator, kp_detector = load_checkpoints(opt.config, [method])
     for j in range(col):
-        imageio.imsave("{}-0-{}.png".format(method, j + 1), (255*driving_images[j].transpose(1,2,0)).astype(np.uint8))
+        imageio.imsave("{}-0-{}.png".format(method, j + 1),
+                       (255 * driving_images[j].transpose(1, 2, 0)).astype(np.uint8))
     for i in range(row):
-        imageio.imsave("{}-{}-0.png".format(method, i + 1), (255*source_images[i].transpose(1,2,0)).astype(np.uint8))
+        imageio.imsave("{}-{}-0.png".format(method, i + 1),
+                       (255 * source_images[i].transpose(1, 2, 0)).astype(np.uint8))
         for j in range(col):
             imageio.imsave("{}-{}-{}.png".format(method, i + 1, j + 1),
-                           (255*generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1,2,0).astype(np.uint8))
-    return gen_tab_latex(col, row)
+                           (255 * generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1, 2, 0).astype(np.uint8))
+    return gen_tab_latex(col, row, method)
 
 
 def gen_compare2(opt):
@@ -153,8 +152,12 @@ if __name__ == "__main__":
                         help="Names of the methods comma separated.")
     parser.add_argument("--path", default=None, help="path to result image")
     parser.add_argument("--num", default=1, type=int, help="number of image")
+    parser.add_argument("--seed", default=0, type=int, help="seed")
     parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
     parser.set_defaults(verbose=False)
     opt = parser.parse_args()
+    with open(opt.config) as f:
+        config = yaml.safe_load(f)
+    dataset = FramesDataset(is_train=False, **config['dataset_params'])
     for method in opt.methods:
-        print(gen_table(opt.config, 4, 4, method))
+        gen_table(config, dataset, 4, 4, method, opt.seed)
