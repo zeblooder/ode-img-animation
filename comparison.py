@@ -134,19 +134,30 @@ def gen_table(config, dataset, col=4, row=4, method='gaussian', seed=0):
     return gen_tab_latex(col, row, method)
 
 
-def gen_compare2(opt):
-    with open(opt.config) as f:
-        config = yaml.safe_load(f)
-    dataset = FramesDataset(is_train=False, **config['dataset_params'])
-    generator_dict, kp_detector_dict = load_checkpoints(opt.config, opt.methods)
-    for i in tqdm(range(opt.num)):
-        source_image, dest_image, default_fname = random_img_pair(dataset)
-        image = visualize_comparison(generator_dict, kp_detector_dict, opt.methods, source_image, dest_image)
-        imageio.imsave(default_fname if opt.path is None else opt.path, image)
+def gen_compare2(config,dataset,methods,num,path,seed=0,caption='11',label='22'):
+    latex_str=r'\begin{figure}{0.55\textwidth}'+'\n'
+    latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format("source")
+    latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format("driving")
+    for m in methods:
+        latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format(m)
+    latex_str=latex_str[:-1]+ r'\\'+'\n'
+    img_str = "    \\includegraphics[width=0.11\\textwidth]{{image/chap04/experiment_src_driv/{}}}\n"
+    generator_dict, kp_detector_dict = load_checkpoints(config, methods)
+    for i in tqdm(range(num)):
+        source_image, dest_image, default_fname = random_img_pair(dataset,seed)
+        image = visualize_comparison(generator_dict, kp_detector_dict, methods, source_image, dest_image)
+        imageio.imsave(default_fname if path is None else path, image)
+        latex_str+=img_str.format(default_fname)
+        if i!=num-1:
+            latex_str+=r'    \\'+'\n'
+    latex_str+="    \\caption{%s}\n    \\label{%s}"%(caption,"fig:"+label)
+    latex_str+=('\n'+r"\end{figure}")
+    return latex_str
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
+    parser.add_argument("--mode",choices=["row","table"], required=True, help="row: show images for different methods in one row. table: show images for different sources and driving images in tables.")
     parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--methods", default=[], type=lambda x: eval(x),
                         help="Names of the methods comma separated.")
@@ -159,5 +170,8 @@ if __name__ == "__main__":
     with open(opt.config) as f:
         config = yaml.safe_load(f)
     dataset = FramesDataset(is_train=False, **config['dataset_params'])
-    for method in opt.methods:
-        gen_table(config, dataset, 4, 4, method, opt.seed)
+    if opt.mode=="row":
+        print(gen_compare2(config,dataset,opt.methods,opt.num,opt.path))
+    elif opt.mode=="table":
+        for method in opt.methods:
+            gen_table(config, dataset, 4, 4, method, opt.seed)
