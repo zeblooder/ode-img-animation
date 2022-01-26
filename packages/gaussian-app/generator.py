@@ -94,7 +94,7 @@ class OcclusionAwareGenerator(nn.Module):
             if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
                 occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
         out=torch.cat([ori_out, out],dim=1) * occlusion_map
-        output_dict["deformed"] = self.deform_input(source_image, dense_motion)
+        output_dict["deformed"] = self.deform_input(source_image, deformation)
         torch.cuda.empty_cache()
 
         # Decoding part
