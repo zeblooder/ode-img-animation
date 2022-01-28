@@ -84,7 +84,7 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(log_dir, os.path.basename(opt.config))):
         copy(opt.config, log_dir)
     result_table = opt.algo + '.csv' if opt.result_table is None else opt.result_table
-    print("Model: " + str(Algo) + ".\nResult table name: " + result_table)
+    print("Model: " + str(Algo) + ".\nResult table name: " + os.path.join(log_dir,result_table))
 
     if opt.mode == 'train':
         print("Training...")
@@ -97,4 +97,4 @@ if __name__ == "__main__":
         animate(opt.algo, config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'evaluation':
         print("Evaluation...")
-        performance(generator, kp_detector, config['pretrained_paths'][opt.algo], dataset, opt.metrics, result_table)
+        performance(generator, kp_detector, config['pretrained_paths'][opt.algo], dataset, opt.metrics,os.path.join(log_dir,result_table))

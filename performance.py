@@ -1,6 +1,7 @@
 import os
 
 import imageio
+import numpy as np
 import torch
 from skimage.transform import resize
 from tqdm import tqdm
@@ -25,11 +26,14 @@ def load_checkpoints(generator, kp_detector, checkpoint_path):
 
 def video2imgLst(video):
     reader = imageio.get_reader(video)
-    fps = reader.get_meta_data()['fps']
+    # fps = reader.get_meta_data()['fps']
     imgLst = []
     try:
         for im in reader:
-            imgLst.append(im)
+            if len(im.shape) == 2:
+                imgLst.append(np.repeat(np.expand_dims(im, axis=2), 3, axis=2))
+            else:
+                imgLst.append(im)
     except RuntimeError:
         pass
     reader.close()
