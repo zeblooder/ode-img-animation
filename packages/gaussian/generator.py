@@ -104,7 +104,7 @@ class OcclusionAwareGenerator(nn.Module):
             F_app = F_app * occlusion_map
             ori_out = ori_out * occlusion_map
         out=torch.cat([ori_out, F_app],dim=1)
-        output_dict["deformed"] = self.deform_input(source_image, dense_motion)
+        output_dict["deformed"] = self.deform_input(source_image, deformation)
 
         torch.cuda.empty_cache()
         # Decoding part
