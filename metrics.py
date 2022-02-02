@@ -86,7 +86,7 @@ class evaluator:
         Video quality. Input must be video
         """
         self.m.reset()
-        self.m.update((torch.tensor(pred, dtype=torch.float32) * 255.0, torch.tensor(src, dtype=torch.float32) * 255.0))
+        self.m.update((torch.tensor(np.array(pred), dtype=torch.float32) * 255.0, torch.tensor(np.array(src), dtype=torch.float32) * 255.0))
         self.result[self.video_cnt, self.metric_index['FID']] = float(self.m.compute())
 
     def AKD(self, kp_driving, kp_prediction):
