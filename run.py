@@ -51,6 +51,7 @@ if __name__ == "__main__":
         log_dir = os.path.join(*os.path.split(opt.checkpoint)[:-1])
     else:
         log_dir = os.path.join(opt.log_dir, os.path.basename(opt.config).split('.')[0])
+        log_dir += ' ' + str(opt.algo)
         log_dir += ' ' + strftime("%d_%m_%y_%H.%M.%S", gmtime())
 
     generator = Algo.generator.OcclusionAwareGenerator(**config['model_params']['generator_params'],
