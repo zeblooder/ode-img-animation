@@ -13,9 +13,7 @@ from frames_dataset import FramesDataset
 from sync_batchnorm import DataParallelWithCallback
 
 
-def load_checkpoint(config_path, checkpoint_path, algo, cpu=False):
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+def load_checkpoint(config, checkpoint_path, algo, cpu=False):
     Algo = importlib.import_module("packages." + algo)
     generator = Algo.generator.OcclusionAwareGenerator(**config['model_params']['generator_params'],
                                                        **config['model_params']['common_params'])
@@ -45,16 +43,14 @@ def load_checkpoint(config_path, checkpoint_path, algo, cpu=False):
     return generator, kp_detector
 
 
-def load_checkpoints(config_path, methods, cpu=False):
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+def load_checkpoints(config, methods, cpu=False):
     if len(methods) == 1:
-        return load_checkpoint(config_path, config['pretrained_paths'][methods[0]], methods[0], cpu)
+        return load_checkpoint(config, config['pretrained_paths'][methods[0]], methods[0], cpu)
     else:
         generator_dict = {}
         kp_detector_dict = {}
         for m in methods:
-            generator_dict[m], kp_detector_dict[m] = load_checkpoint(config_path, config['pretrained_paths'][m], m, cpu)
+            generator_dict[m], kp_detector_dict[m] = load_checkpoint(config, config['pretrained_paths'][m], m, cpu)
         return generator_dict, kp_detector_dict
 
 
@@ -76,7 +72,8 @@ def visualize_comparison(generator_dict, kp_detector_dict, methods, source_image
     return image
 
 
-def random_img_pair(dataset):
+def random_img_pair(dataset,seed=0):
+    random.seed(seed)
     rand_list = random.sample(range(len(dataset)), 2)
     src_video = dataset.__getitem__(rand_list[0])['video']
     dest_video = dataset.__getitem__(rand_list[1])['video']
@@ -121,7 +118,7 @@ def gen_tab_latex(col, row, method):
 
 def gen_table(config, dataset, col=4, row=4, method='gaussian', seed=0):
     source_images, driving_images = random_specified_num_img_pair(dataset, col, row, seed)
-    generator, kp_detector = load_checkpoints(opt.config, [method])
+    generator, kp_detector = load_checkpoints(config, [method])
     for j in range(col):
         imageio.imsave("{}-0-{}.png".format(method, j + 1),
                        (255 * driving_images[j].transpose(1, 2, 0)).astype(np.uint8))
@@ -171,7 +168,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
     dataset = FramesDataset(is_train=False, **config['dataset_params'])
     if opt.mode=="row":
-        print(gen_compare2(config,dataset,opt.methods,opt.num,opt.path))
+        print(gen_compare2(config,dataset,opt.methods,opt.num,opt.path,opt.seed))
     elif opt.mode=="table":
         for method in opt.methods:
             gen_table(config, dataset, 4, 4, method, opt.seed)
