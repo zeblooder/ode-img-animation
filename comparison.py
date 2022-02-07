@@ -72,11 +72,14 @@ def visualize_comparison(generator_dict, kp_detector_dict, methods, source_image
     return image
 
 
-def random_img_pair(dataset,seed=0):
+def random_img_pair(dataset,mode,seed=0):
     random.seed(seed)
     rand_list = random.sample(range(len(dataset)), 2)
     src_video = dataset.__getitem__(rand_list[0])['video']
-    dest_video = dataset.__getitem__(rand_list[1])['video']
+    if mode=="rec":
+        dest_video =src_video
+    elif mode=="anim":
+        dest_video = dataset.__getitem__(rand_list[1])['video']
     src_frame_index = np.random.randint(src_video.shape[1])
     src_image = src_video[:, src_frame_index, :, :]
     dest_frame_index = np.random.randint(dest_video.shape[1])
@@ -131,7 +134,7 @@ def gen_table(config, dataset, col=4, row=4, method='gaussian', seed=0):
     return gen_tab_latex(col, row, method)
 
 
-def gen_compare2(config,dataset,methods,num,path,seed=0,caption='11',label='22'):
+def gen_compare2(config,dataset,methods,num,path,mode='rec',seed=0,caption='11',label='22'):
     latex_str=r'\begin{figure}{0.55\textwidth}'+'\n'
     latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format("source")
     latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format("driving")
@@ -141,7 +144,7 @@ def gen_compare2(config,dataset,methods,num,path,seed=0,caption='11',label='22')
     img_str = "    \\includegraphics[width=0.11\\textwidth]{{image/chap04/experiment_src_driv/{}}}\n"
     generator_dict, kp_detector_dict = load_checkpoints(config, methods)
     for i in tqdm(range(num)):
-        source_image, dest_image, default_fname = random_img_pair(dataset,seed)
+        source_image, dest_image, default_fname = random_img_pair(dataset,mode,seed)
         image = visualize_comparison(generator_dict, kp_detector_dict, methods, source_image, dest_image)
         imageio.imsave(default_fname if path is None else path, image)
         latex_str+=img_str.format(default_fname)
@@ -154,7 +157,8 @@ def gen_compare2(config,dataset,methods,num,path,seed=0,caption='11',label='22')
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--mode",choices=["row","table"], required=True, help="row: show images for different methods in one row. table: show images for different sources and driving images in tables.")
+    parser.add_argument("--mode",choices=["rec","anim"], default="rec", help="reconstruction or animation")
+    parser.add_argument("--format",choices=["row","table"], required=True, help="row: show images for different methods in one row. table: show images for different sources and driving images in tables.")
     parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--methods", default=[], type=lambda x: eval(x),
                         help="Names of the methods comma separated.")
@@ -167,8 +171,8 @@ if __name__ == "__main__":
     with open(opt.config) as f:
         config = yaml.safe_load(f)
     dataset = FramesDataset(is_train=False, **config['dataset_params'])
-    if opt.mode=="row":
-        print(gen_compare2(config,dataset,opt.methods,opt.num,opt.path,opt.seed))
-    elif opt.mode=="table":
+    if opt.format=="row":
+        print(gen_compare2(config,dataset,opt.methods,opt.num,opt.path,opt.mode,opt.seed))
+    elif opt.format=="table":
         for method in opt.methods:
             gen_table(config, dataset, 4, 4, method, opt.seed)
