@@ -13,7 +13,7 @@ class OcclusionAwareGenerator(nn.Module):
     """
 
     def __init__(self, num_channels, num_kp, block_expansion, max_features, num_down_blocks,
-                 num_bottleneck_blocks, estimate_occlusion_map=False, dense_motion_params=None, estimate_jacobian=False):
+                 num_bottleneck_blocks, integration_time, estimate_occlusion_map=False, dense_motion_params=None, estimate_jacobian=False):
         super(OcclusionAwareGenerator, self).__init__()
 
         if dense_motion_params is not None:
@@ -22,7 +22,7 @@ class OcclusionAwareGenerator(nn.Module):
                                                            **dense_motion_params)
         else:
             self.dense_motion_network = None
-        self.ode = ODENet()
+        self.ode = ODENet(integration_time)
         self.first = SameBlock2d(num_channels, block_expansion, kernel_size=(7, 7), padding=(3, 3))
 
         self.flow_param = {'input_dim': 256, 'dim': 64, 'n_res': 2, 'activ': 'relu',
