@@ -13,3 +13,4 @@ checkpoint/
 *.csv
 *.mp4
 *.png
+/exp-cpk

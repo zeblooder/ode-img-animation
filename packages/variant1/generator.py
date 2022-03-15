@@ -12,7 +12,7 @@ class OcclusionAwareGenerator(nn.Module):
     """
 
     def __init__(self, num_channels, num_kp, block_expansion, max_features, num_down_blocks,
-                 num_bottleneck_blocks, estimate_occlusion_map=False, dense_motion_params=None, estimate_jacobian=False):
+                 num_bottleneck_blocks, integration_time, estimate_occlusion_map=False, dense_motion_params=None, estimate_jacobian=False):
         super(OcclusionAwareGenerator, self).__init__()
 
         if dense_motion_params is not None:
@@ -56,7 +56,7 @@ class OcclusionAwareGenerator(nn.Module):
         _, _, h, w = inp.shape
         if h_old != h or w_old != w:
             deformation = deformation.permute(0, 3, 1, 2)
-            deformation = F.interpolate(deformation, size=(h, w), mode='bilinear')
+            deformation = F.interpolate(deformation, size=(h, w), mode='bilinear', align_corners=True)
             deformation = deformation.permute(0, 2, 3, 1)
         return F.grid_sample(inp, deformation, align_corners=True)
 
@@ -93,7 +93,7 @@ class OcclusionAwareGenerator(nn.Module):
 
         if occlusion_map is not None:
             if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
-                occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
+                occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear', align_corners=True)
             F_app = F_app * occlusion_map
             ori_out = ori_out * occlusion_map
         out=torch.cat([ori_out, F_app],dim=1)
