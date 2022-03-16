@@ -58,27 +58,31 @@ def generate(generator, kp_detector, source, driving_frame):
     source_tensor = torch.tensor(source[np.newaxis].astype(np.float32)).cuda()
     with torch.no_grad():
         kp_source = kp_detector(source_tensor)
-        kp_driving = kp_detector(torch.tensor(driving_frame[np.newaxis].astype(np.float32)).cuda())
-        out = generator(source_tensor, kp_source=kp_source, kp_driving=kp_driving)
+        kp_driving = kp_detector(torch.tensor(
+            driving_frame[np.newaxis].astype(np.float32)).cuda())
+        out = generator(source_tensor, kp_source=kp_source,
+                        kp_driving=kp_driving)
     return out['prediction'].data.cpu().numpy()[0]
 
 
 def visualize_comparison(generator_dict, kp_detector_dict, methods, source_image, dest_image):
-    res = [source_image.transpose([1, 2, 0]) * 255.0, dest_image.transpose([1, 2, 0]) * 255.0]
+    res = [source_image.transpose(
+        [1, 2, 0]) * 255.0, dest_image.transpose([1, 2, 0]) * 255.0]
     for m in methods:
         res.append(
             generate(generator_dict[m], kp_detector_dict[m], source_image, dest_image).transpose([1, 2, 0]) * 255.0)
-    image = np.hstack(res).astype(np.uint8)
-    return image
+    # image = np.hstack(res).astype(np.uint8)
+    return res
 
 
-def random_img_pair(dataset,mode,seed=0):
+def random_img_pair(dataset, mode, seed=0, seed_np=0):
     random.seed(seed)
+    np.random.seed(seed_np)
     rand_list = random.sample(range(len(dataset)), 2)
     src_video = dataset.__getitem__(rand_list[0])['video']
-    if mode=="rec":
-        dest_video =src_video
-    elif mode=="anim":
+    if mode == "rec":
+        dest_video = src_video
+    elif mode == "anim":
         dest_video = dataset.__getitem__(rand_list[1])['video']
     src_frame_index = np.random.randint(src_video.shape[1])
     src_image = src_video[:, src_frame_index, :, :]
@@ -97,9 +101,12 @@ def random_specified_num_img_pair(dataset, col, row, seed=0, source_index=0):
     random.seed(seed)
     rand_list = random.sample(range(len(dataset)), row)
     driving_video = dataset.__getitem__(rand_list[0])['video']
-    source_videos = [dataset.__getitem__(rand_list[i])['video'] for i in range(row)]
-    dest_frame_index = [i + 1 for i in sorted(random.sample(range(driving_video.shape[1] - 1), col))]
-    source_images = [source_videos[i][:, source_index, :, :] for i in range(row)]
+    source_videos = [dataset.__getitem__(
+        rand_list[i])['video'] for i in range(row)]
+    dest_frame_index = [
+        i + 1 for i in sorted(random.sample(range(driving_video.shape[1] - 1), col))]
+    source_images = [source_videos[i][:, source_index, :, :]
+                     for i in range(row)]
     driving_images = [driving_video[:, i, :, :] for i in dest_frame_index]
     return source_images, driving_images
 
@@ -119,60 +126,55 @@ def gen_tab_latex(col, row, method):
     return ret + '\\end{tabular}'
 
 
-def gen_table(config, dataset, col=4, row=4, method='gaussian', seed=0):
-    source_images, driving_images = random_specified_num_img_pair(dataset, col, row, seed)
+def gen_table(config, dataset, path, col=4, row=4, method='gaussian', seed=0):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    source_images, driving_images = random_specified_num_img_pair(
+        dataset, col, row, seed)
     generator, kp_detector = load_checkpoints(config, [method])
     for j in range(col):
-        imageio.imsave("{}-0-{}.png".format(method, j + 1),
-                       (255 * driving_images[j].transpose(1, 2, 0)).astype(np.uint8))
+        imageio.imsave("{}/{}-0-{}.png".format(path, method, j + 1),(255 * driving_images[j].transpose(1, 2, 0)).astype(np.uint8))
     for i in range(row):
-        imageio.imsave("{}-{}-0.png".format(method, i + 1),
-                       (255 * source_images[i].transpose(1, 2, 0)).astype(np.uint8))
+        imageio.imsave("{}/{}-{}-0.png".format(path, method, i + 1),(255 * source_images[i].transpose(1, 2, 0)).astype(np.uint8))
         for j in range(col):
-            imageio.imsave("{}-{}-{}.png".format(method, i + 1, j + 1),
-                           (255 * generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1, 2, 0).astype(np.uint8))
+            imageio.imsave("{}/{}-{}-{}.png".format(path, method, i + 1, j + 1),(255 * generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1, 2, 0).astype(np.uint8))
     return gen_tab_latex(col, row, method)
 
 
-def gen_compare2(config,dataset,methods,num,path,mode='rec',seed=0,caption='11',label='22'):
-    latex_str=r'\begin{figure}{0.55\textwidth}'+'\n'
-    latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format("source")
-    latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format("driving")
-    for m in methods:
-        latex_str+="    \\makebox[0.18\\textwidth]{{\\scriptsize {}}}\n".format(m)
-    latex_str=latex_str[:-1]+ r'\\'+'\n'
-    img_str = "    \\includegraphics[width=0.11\\textwidth]{{image/chap04/experiment_src_driv/{}}}\n"
-    generator_dict, kp_detector_dict = load_checkpoints(config, methods)
-    for i in tqdm(range(num)):
-        source_image, dest_image, default_fname = random_img_pair(dataset,mode,seed)
-        image = visualize_comparison(generator_dict, kp_detector_dict, methods, source_image, dest_image)
-        imageio.imsave(default_fname if path is None else path, image)
-        latex_str+=img_str.format(default_fname)
-        if i!=num-1:
-            latex_str+=r'    \\'+'\n'
-    latex_str+="    \\caption{%s}\n    \\label{%s}"%(caption,"fig:"+label)
-    latex_str+=('\n'+r"\end{figure}")
-    return latex_str
+def gen_compare2(dataset, methods, generator_dict, kp_detector_dict, path, mode='rec', seed=0, seed_np=0, caption='11', label='22'):
+    source_image, dest_image, default_fname = random_img_pair(dataset, mode, seed, seed_np)
+    images = visualize_comparison(generator_dict, kp_detector_dict, methods, source_image, dest_image)
+    for j, img in enumerate(images):
+        imageio.imsave(os.path.splitext(default_fname)[0]+str(j)+'.png' if path is None else path, img.astype(np.uint8))
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--mode",choices=["rec","anim"], default="rec", help="reconstruction or animation")
-    parser.add_argument("--format",choices=["row","table"], required=True, help="row: show images for different methods in one row. table: show images for different sources and driving images in tables.")
+    parser.add_argument(
+        "--mode", choices=["rec", "anim"], default="rec", help="reconstruction or animation")
+    parser.add_argument("--format", choices=["row", "table"], required=True,
+                        help="row: show images for different methods in one row. table: show images for different sources and driving images in tables.")
     parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--methods", default=[], type=lambda x: eval(x),
                         help="Names of the methods comma separated.")
     parser.add_argument("--path", default=None, help="path to result image")
-    parser.add_argument("--num", default=1, type=int, help="number of image")
+    parser.add_argument("--num_src", default=1, type=int,
+                        help="number of source images")
+    parser.add_argument("--num_driv", default=1, type=int,
+                        help="number of driving images")
     parser.add_argument("--seed", default=0, type=int, help="seed")
-    parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
+    parser.add_argument("--verbose", dest="verbose",
+                        action="store_true", help="Print model architecture")
     parser.set_defaults(verbose=False)
     opt = parser.parse_args()
     with open(opt.config) as f:
         config = yaml.safe_load(f)
     dataset = FramesDataset(is_train=False, **config['dataset_params'])
-    if opt.format=="row":
-        print(gen_compare2(config,dataset,opt.methods,opt.num,opt.path,opt.mode,opt.seed))
-    elif opt.format=="table":
+    if opt.format == "row":
+        generator_dict, kp_detector_dict = load_checkpoints(config, opt.methods)
+        for i in tqdm(range(opt.num_src*opt.num_driv)):
+            seed1,seed2=divmod(i,opt.num_driv)
+            gen_compare2(dataset, opt.methods, generator_dict, kp_detector_dict, opt.path, opt.mode, opt.seed+seed1, opt.seed+seed2)
+    elif opt.format == "table":
         for method in opt.methods:
-            gen_table(config, dataset, 4, 4, method, opt.seed)
+            print(gen_table(config, dataset, str(opt.seed), 4, 4, method, opt.seed))
