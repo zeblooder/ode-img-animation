@@ -22,7 +22,7 @@ class OcclusionAwareGenerator(nn.Module):
                                                            **dense_motion_params)
         else:
             self.dense_motion_network = None
-        self.ode = ODENet()
+        self.ode = ODENet(integration_time)
         self.first = SameBlock2d(num_channels, block_expansion, kernel_size=(7, 7), padding=(3, 3))
 
         self.flow_param = {'input_dim': 256, 'dim': 64, 'n_res': 2, 'activ': 'relu',
@@ -64,24 +64,24 @@ class OcclusionAwareGenerator(nn.Module):
 
     def forward(self, source_image, kp_driving, kp_source):
         # Transforming feature representation according to deformation and occlusion
-        # output_dict = {}
+        output_dict = {}
 
         if self.dense_motion_network is not None:
             dense_motion = self.dense_motion_network(source_image=source_image, kp_driving=kp_driving,
                                                      kp_source=kp_source)
-            # output_dict['mask'] = dense_motion['mask']
-            # output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
+            output_dict['mask'] = dense_motion['mask']
+            output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
 
-            # if 'occlusion_map' in dense_motion:
-            #     occlusion_map = dense_motion['occlusion_map']
-            #     output_dict['occlusion_map'] = occlusion_map
-            # else:
-            #     occlusion_map = None
+            if 'occlusion_map' in dense_motion:
+                occlusion_map = dense_motion['occlusion_map']
+                output_dict['occlusion_map'] = occlusion_map
+            else:
+                occlusion_map = None
             deformation = dense_motion['deformation']
 
         torch.cuda.empty_cache()
 
-        # Encoding (downsampling) part, out鏄壒寰丗_S
+        # Encoding (downsampling) part, out是特征F_S
         out = self.first(source_image)
         for i in range(len(self.down_blocks)):
             out = self.down_blocks[i](out)
@@ -89,19 +89,22 @@ class OcclusionAwareGenerator(nn.Module):
         torch.cuda.empty_cache()
 
         # Transforming feature representation according to deformation and occlusion
-        output_dict = {}
         if self.ode is not None:
-            dense_motion = self.ode(deformation) # 姹傝ВODE,杩斿洖F_{S->D} 1*64*64*2
+            dense_motion = self.ode(deformation) # 求解ODE,返回F_{S->D} 1*64*64*2
 
             out = self.deform_input(out, dense_motion) # F_{SD}
 
         if self.appearance_flow is not None:
             F_app, flow_maps = self.appearance_flow(out) # F_{SD}
 
-        out=torch.cat([out,F_app],dim=1)
+        if occlusion_map is not None:
+            if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
+                occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear', align_corners=True)
+            F_app = F_app * occlusion_map
+        out=torch.cat([F_app, F_app],dim=1)
+        output_dict["deformed"] = self.deform_input(source_image, deformation)
 
         torch.cuda.empty_cache()
-
         # Decoding part
         out = self.bottleneck(out)
         for i in range(len(self.up_blocks)):
@@ -109,7 +112,7 @@ class OcclusionAwareGenerator(nn.Module):
         out = self.final(out)
         out = torch.sigmoid(out)
 
-        out = F.interpolate(out,scale_factor=0.5, recompute_scale_factor=True)
+        out = F.interpolate(out,scale_factor=0.5,recompute_scale_factor=True)
         output_dict["prediction"] = out
 
         return output_dict

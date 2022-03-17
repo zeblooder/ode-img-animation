@@ -336,3 +336,5 @@ class LayerNorm(nn.Module):
                                 self.bias.expand(normalized_shape))
         else:
             return F.layer_norm(x, normalized_shape)
+
+
