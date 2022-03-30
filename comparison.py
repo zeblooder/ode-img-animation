@@ -44,14 +44,14 @@ def load_checkpoint(config, checkpoint_path, algo, cpu=False):
 
 
 def load_checkpoints(config, methods, cpu=False):
-    if len(methods) == 1:
-        return load_checkpoint(config, config['pretrained_paths'][methods[0]], methods[0], cpu)
-    else:
-        generator_dict = {}
-        kp_detector_dict = {}
-        for m in methods:
-            generator_dict[m], kp_detector_dict[m] = load_checkpoint(config, config['pretrained_paths'][m], m, cpu)
-        return generator_dict, kp_detector_dict
+    # if len(methods) == 1:
+    #     return load_checkpoint(config, config['pretrained_paths'][methods[0]], methods[0], cpu)
+    # else:
+    generator_dict = {}
+    kp_detector_dict = {}
+    for m in methods:
+        generator_dict[m], kp_detector_dict[m] = load_checkpoint(config, config['pretrained_paths'][m], m, cpu)
+    return generator_dict, kp_detector_dict
 
 
 def generate(generator, kp_detector, source, driving_frame):
@@ -94,12 +94,13 @@ def random_img_pair(dataset, mode, seed=0, seed_np=0):
         dest_frame_index) + '_' + '.png'
 
 
-def random_specified_num_img_pair(dataset, col, row, seed=0, source_index=0):
+def random_specified_num_img_pair(dataset, col, row, seed1=0,seed2=0, source_index=0):
     """
     generate images for showing results in a table
     """
-    random.seed(seed)
+    random.seed(seed1)
     rand_list = random.sample(range(len(dataset)), row)
+    random.seed(seed2)
     driving_video = dataset.__getitem__(rand_list[0])['video']
     source_videos = [dataset.__getitem__(
         rand_list[i])['video'] for i in range(row)]
@@ -126,26 +127,24 @@ def gen_tab_latex(col, row, method):
     return ret + '\\end{tabular}'
 
 
-def gen_table(config, dataset, path, col=4, row=4, method='gaussian', seed=0):
-    if not os.path.exists(path):
-        os.makedirs(path)
-    source_images, driving_images = random_specified_num_img_pair(
-        dataset, col, row, seed)
-    generator, kp_detector = load_checkpoints(config, [method])
-    for j in range(col):
-        imageio.imsave("{}/{}-0-{}.png".format(path, method, j + 1),(255 * driving_images[j].transpose(1, 2, 0)).astype(np.uint8))
-    for i in range(row):
-        imageio.imsave("{}/{}-{}-0.png".format(path, method, i + 1),(255 * source_images[i].transpose(1, 2, 0)).astype(np.uint8))
+def gen_table(dataset, generator, kp_detector, path, method, seed1=0,seed2=0, col=4, row=4):
+        source_images, driving_images = random_specified_num_img_pair(dataset, col, row, seed1,seed2)
         for j in range(col):
-            imageio.imsave("{}/{}-{}-{}.png".format(path, method, i + 1, j + 1),(255 * generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1, 2, 0).astype(np.uint8))
-    return gen_tab_latex(col, row, method)
+            imageio.imsave("{}/{}-0-{}.png".format(path, method, j + 1),(255 * driving_images[j].transpose(1, 2, 0)).astype(np.uint8))
+        for i in range(row):
+            imageio.imsave("{}/{}-{}-0.png".format(path, method, i + 1),(255 * source_images[i].transpose(1, 2, 0)).astype(np.uint8))
+            for j in range(col):
+                imageio.imsave("{}/{}-{}-{}.png".format(path, method, i + 1, j + 1),(255 * generate(generator, kp_detector, source_images[i], driving_images[j])).transpose(1, 2, 0).astype(np.uint8))
+        # return gen_tab_latex(col, row, method)
 
 
 def gen_compare2(dataset, methods, generator_dict, kp_detector_dict, path, mode='rec', seed=0, seed_np=0, caption='11', label='22'):
+    if not os.path.exists(path):
+        os.makedirs(path)
     source_image, dest_image, default_fname = random_img_pair(dataset, mode, seed, seed_np)
     images = visualize_comparison(generator_dict, kp_detector_dict, methods, source_image, dest_image)
     for j, img in enumerate(images):
-        imageio.imsave(os.path.splitext(default_fname)[0]+str(j)+'.png' if path is None else path, img.astype(np.uint8))
+        imageio.imsave(os.path.join(path, os.path.splitext(default_fname)[0]+str(j)+'.png'), img.astype(np.uint8))
 
 
 if __name__ == "__main__":
@@ -176,5 +175,17 @@ if __name__ == "__main__":
             seed1,seed2=divmod(i,opt.num_driv)
             gen_compare2(dataset, opt.methods, generator_dict, kp_detector_dict, opt.path, opt.mode, opt.seed+seed1, opt.seed+seed2)
     elif opt.format == "table":
+        if not os.path.exists(opt.path):
+            os.makedirs(opt.path)
+        gd, kd = load_checkpoints(config, opt.methods)
         for method in opt.methods:
-            print(gen_table(config, dataset, str(opt.seed), 4, 4, method, opt.seed))
+            generator, kp_detector = gd[method],kd[method]
+            for i in tqdm(range(opt.num_src*opt.num_driv)):
+                seed1,seed2=divmod(i,opt.num_driv)
+                subpath=os.path.join(opt.path,str(seed1))
+                if not os.path.exists(subpath):
+                    os.makedirs(subpath)  
+                new_path=os.path.join(subpath,str(seed2))
+                if not os.path.exists(new_path):
+                    os.makedirs(new_path)          
+                    gen_table(dataset, generator, kp_detector, new_path, method, opt.seed+seed1,opt.seed+seed2,4,10)
