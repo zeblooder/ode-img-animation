@@ -36,6 +36,7 @@ model_params:
       max_features: 1024
       num_blocks: 5
       scale_factor: 0.25
+    integration_time: 1
   discriminator_params:
     scales: [1]
     block_expansion: 32
@@ -82,3 +83,7 @@ visualizer_params:
   kp_size: 5
   draw_border: True
   colormap: 'gist_rainbow'
+pretrained_paths:
+  FOMM: 'log/mgif-256 27_01_22_08.02.34/00000099-checkpoint.pth.tar'
+  gaussian: 'log/mgif-256 27_01_22_16.33.41/00000099-checkpoint.pth.tar'
+  bilinear: 'log/mgif-256 27_01_22_07.55.42/00000099-checkpoint.pth.tar'

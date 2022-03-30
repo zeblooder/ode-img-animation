@@ -1,5 +1,5 @@
 dataset_params:
-  root_dir: data/vox-png
+  root_dir: data/vox
   frame_shape: [256, 256, 3]
   id_sampling: True
   pairs_list: data/vox256.csv
@@ -36,6 +36,7 @@ model_params:
       max_features: 1024
       num_blocks: 5
       scale_factor: 0.25
+    integration_time: 1
   discriminator_params:
     scales: [1]
     block_expansion: 32
@@ -81,3 +82,7 @@ visualizer_params:
   kp_size: 5
   draw_border: True
   colormap: 'gist_rainbow'
+pretrained_paths:
+  FOMM: 'log/vox-256 30_01_22_12.59.42/00000099-checkpoint.pth.tar'
+  gaussian: 'exp-cpk/vox/00000194-checkpoint.pth.tar'
+  bilinear: 'log/fashion-256 05_01_22_00.05.02/00000099-checkpoint.pth.tar'

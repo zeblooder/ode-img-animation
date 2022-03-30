@@ -31,6 +31,7 @@ model_params:
       max_features: 1024
       num_blocks: 5
       scale_factor: 0.25
+    integration_time: 1
   discriminator_params:
     scales: [1]
     block_expansion: 32
@@ -77,6 +78,11 @@ visualizer_params:
   colormap: 'gist_rainbow'
 
 pretrained_paths:
-  FOMM: 'log/fashion-256 08_01_22_03.03.23/00000099-checkpoint.pth.tar'
-  gaussian: 'checkpoint/00000099-checkpoint.pth.tar'
-  bilinear: 'log/fashion-256 05_01_22_00.05.02/00000099-checkpoint.pth.tar'
+  FOMM: 'exp-cpk\fashion\FOMM.pth.tar'
+  gaussian: 'exp-cpk\fashion\full.pth.tar'
+  # gaussian: 'exp-cpk\fashion\gaussian0_5.pth.tar'
+  # gaussian: 'exp-cpk\fashion\gaussian0_25.pth.tar'
+  bilinear: 'exp-cpk\fashion\bilinear.pth.tar'
+  variant1: 'exp-cpk\fashion\variant1.pth.tar'
+  variant2: 'exp-cpk\fashion\variant2.pth.tar'
+  variant3: 'exp-cpk\fashion\variant3.pth.tar'
