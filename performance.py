@@ -37,8 +37,7 @@ def video2imgLst(video):
     return imgLst
 
 
-def performance(generator, kp_detector, checkpoint_path, dataset, metrics, result_table, specified_source,
-                source_image=None):
+def performance(generator, kp_detector, checkpoint_path, dataset, metrics, result_table, specified_source=False, source_image=None):
     new_dataset = dataset.videos
     if specified_source:
         source_video_index = 0
@@ -58,7 +57,7 @@ def performance(generator, kp_detector, checkpoint_path, dataset, metrics, resul
     load_checkpoints(generator, kp_detector, checkpoint_path)
     e = evaluator(kp_detector, generator, metrics, len(new_dataset))
 
-    for x in new_dataset:
+    for x in new_dataset[:1]:
         driving_img_lst = video2imgLst(os.path.join(dataset.root_dir, x))
         e.evaluate(source_image, driving_img_lst)
     e.save_res(result_table)

@@ -31,15 +31,13 @@ if __name__ == "__main__":
     parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "animate", "evaluation"])
     parser.add_argument("--log_dir", default='log', help="path to log into")
+    parser.add_argument("--result_table", default='result.csv', help="path to table to evaluate model")
     parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
     parser.add_argument("--device_ids", default="0", type=lambda x: list(map(int, x.split(','))),
                         help="Names of the devices comma separated.")
     parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
-    parser.add_argument("--specified_source", dest="specified_source", action="store_true",
-                        help="Specify source image in code")
     parser.add_argument("--metrics", default="0", type=lambda x: list(map(str, x.split(','))),
                         help="Names of the metrics comma separated.")
-    parser.add_argument("--result_table", default='result.csv', help="path to output")
     parser.set_defaults(verbose=False)
 
     opt = parser.parse_args()
@@ -50,6 +48,7 @@ if __name__ == "__main__":
         log_dir = os.path.join(*os.path.split(opt.checkpoint)[:-1])
     else:
         log_dir = os.path.join(opt.log_dir, os.path.basename(opt.config).split('.')[0])
+        log_dir += ' ' + str(opt.mode)
         log_dir += ' ' + strftime("%d_%m_%y_%H.%M.%S", gmtime())
 
     generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
@@ -82,17 +81,10 @@ if __name__ == "__main__":
         os.makedirs(log_dir)
     if not os.path.exists(os.path.join(log_dir, os.path.basename(opt.config))):
         copy(opt.config, log_dir)
-
+    
     if opt.mode == 'train':
         print("Training...")
         train(config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
-    elif opt.mode == 'reconstruction':
-        print("Reconstruction...")
-        reconstruction(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
-    elif opt.mode == 'animate':
-        print("Animate...")
-        animate(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'evaluation':
         print("Evaluation...")
-        performance(generator, kp_detector, opt.checkpoint, dataset, opt.metrics, opt.result_table,
-                    opt.specified_source)
+        performance(generator, kp_detector, config['pretrained_paths'], dataset, opt.metrics,os.path.join(log_dir,opt.result_table))
