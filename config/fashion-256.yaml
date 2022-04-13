@@ -31,6 +31,7 @@ model_params:
       max_features: 1024
       num_blocks: 5
       scale_factor: 0.25
+    integration_time: 1
   discriminator_params:
     scales: [1]
     block_expansion: 32
@@ -39,14 +40,14 @@ model_params:
 
 train_params:
   num_epochs: 100
-  num_repeats: 50
+  num_repeats: 1
   epoch_milestones: [60, 90]
   lr_generator: 2.0e-4
   lr_discriminator: 2.0e-4
   lr_kp_detector: 2.0e-4
-  batch_size: 4
+  batch_size: 1
   scales: [1, 0.5, 0.25, 0.125]
-  checkpoint_freq: 50
+  checkpoint_freq: 1
   transform_params:
     sigma_affine: 0.05
     sigma_tps: 0.005
@@ -75,3 +76,5 @@ visualizer_params:
   kp_size: 5
   draw_border: True
   colormap: 'gist_rainbow'
+
+pretrained_paths:

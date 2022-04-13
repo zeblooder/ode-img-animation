@@ -35,6 +35,7 @@ model_params:
       max_features: 1024
       num_blocks: 5
       scale_factor: 0.25
+    integration_time: 1
   discriminator_params:
     scales: [1]
     block_expansion: 32
@@ -64,19 +65,4 @@ train_params:
     equivariance_value: 10
     equivariance_jacobian: 10
 
-reconstruction_params:
-  num_videos: 1000
-  format: '.mp4'
-
-animate_params:
-  num_pairs: 50
-  format: '.mp4'
-  normalization_params:
-    adapt_movement_scale: False
-    use_relative_movement: True
-    use_relative_jacobian: True
-
-visualizer_params:
-  kp_size: 5
-  draw_border: True
-  colormap: 'gist_rainbow'
+pretrained_paths:

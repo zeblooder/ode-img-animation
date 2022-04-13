@@ -20,8 +20,6 @@ from modules.keypoint_detector import KPDetector
 import torch
 
 from train import train
-from reconstruction import reconstruction
-from animate import animate
 from performance import performance
 
 if __name__ == "__main__":

@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torchdiffeq import odeint_adjoint, odeint
-from .util import SameBlock2d
 # parser = argparse.ArgumentParser()
 # parser.add_argument('--tol', type=float, default=1e-3)
 # parser.add_argument('--adjoint', type=eval, default=True, choices=[True, False])
@@ -81,11 +80,11 @@ class ODEfunc(nn.Module):
 
 class ODEBlock(nn.Module):
 
-    def __init__(self, odefunc, adjoint=True,tol=1e-3):
+    def __init__(self, odefunc, integration_time=1, adjoint=True,tol=1e-3):
 
         super(ODEBlock, self).__init__()
         self.odefunc = odefunc
-        self.integration_time = torch.tensor([0, 1]).float()
+        self.integration_time = torch.tensor([0, integration_time]).float()
         self.tol=tol
         self.odeint= odeint_adjoint if adjoint else odeint
 
@@ -164,7 +163,7 @@ def makedirs(dirname):
         os.makedirs(dirname)
 
 class ODENet(nn.Module):
-    def __init__(self):
+    def __init__(self, integration_time):
         super(ODENet, self).__init__()
         # downsampling_layers = [
         #     nn.Conv2d(1, 64, 3, 1),
@@ -175,7 +174,7 @@ class ODENet(nn.Module):
         #     nn.ReLU(inplace=True),
         #     nn.Conv2d(64, 64, 4, 2, 1),
         # ]
-        feature_layers = [ODEBlock(ODEfunc(64))]
+        feature_layers = [ODEBlock(ODEfunc(64),integration_time)]
         # fc_layers = [norm(64), nn.ReLU(inplace=True), nn.AdaptiveAvgPool2d((1, 1)), (64,1,3)]
 
         self.model = nn.Sequential(*feature_layers)
