@@ -17,8 +17,6 @@ from frames_dataset import FramesDataset
 import torch
 
 from train import train
-from reconstruction import reconstruction
-from animate import animate
 from performance import performance
 
 if __name__ == "__main__":
@@ -90,12 +88,6 @@ if __name__ == "__main__":
     if opt.mode == 'train':
         print("Training...")
         train(opt.algo, config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
-    elif opt.mode == 'reconstruction':
-        print("Reconstruction...")
-        reconstruction(opt.algo, config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
-    elif opt.mode == 'animate':
-        print("Animate...")
-        animate(opt.algo, config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     elif opt.mode == 'evaluation':
         print("Evaluation...")
         performance(generator, kp_detector, config['pretrained_paths'][opt.algo], dataset, opt.metrics,os.path.join(log_dir,result_table))
