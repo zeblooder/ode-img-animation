@@ -66,4 +66,9 @@ train_params:
     equivariance_value: 10
     equivariance_jacobian: 10
 
+visualizer_params:
+  kp_size: 5
+  draw_border: True
+  colormap: 'gist_rainbow'
+
 pretrained_paths:
