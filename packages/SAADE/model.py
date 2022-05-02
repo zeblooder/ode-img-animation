@@ -129,12 +129,14 @@ class GeneratorFullModel(torch.nn.Module):
     Merge all generator related updates into single model for better multi-gpu usage
     """
 
-    def __init__(self, kp_extractor, generator, train_params):
+    def __init__(self, kp_extractor, generator, discriminator, train_params):
         super(GeneratorFullModel, self).__init__()
         self.kp_extractor = kp_extractor
         self.generator = generator
+        self.discriminator = discriminator
         self.train_params = train_params
         self.scales = train_params['scales']
+        self.disc_scales = self.discriminator.scales
         self.pyramid = ImagePyramide(self.scales, generator.num_channels)
         if torch.cuda.is_available():
             self.pyramid = self.pyramid.cuda()
@@ -183,3 +185,16 @@ class GeneratorFullModel(torch.nn.Module):
             loss_values['equivariance_value'] = self.loss_weights['equivariance_value'] * value
 
         return loss_values, generated
+
+class DiscriminatorFullModel(torch.nn.Module):
+    """
+    No discriminator in SAADE
+    """
+
+    def __init__(self, kp_extractor, generator, discriminator, train_params):
+        super(DiscriminatorFullModel, self).__init__()
+
+    def forward(self, x, generated):
+        loss_values={'disc_gan': torch.tensor(0.0)}
+
+        return loss_values
