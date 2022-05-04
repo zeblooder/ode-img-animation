@@ -17,8 +17,8 @@ class KPDetector(nn.Module):
         self.predictor = Hourglass(block_expansion, in_features=num_channels,
                                    max_features=max_features, num_blocks=num_blocks)
 
-        self.kp = nn.Conv2d(in_channels=self.predictor.out_filters, out_channels=num_kp, kernel_size=(7, 7), padding=pad)
-        self.heatmap = nn.Conv2d(in_channels=self.predictor.out_filters, out_channels=num_kp*2, kernel_size=(7, 7), padding=3)
+        self.kp = nn.Conv2d(in_channels=self.predictor.out_filters, out_channels=num_kp, kernel_size=(7, 7),
+                            padding=pad)
 
         self.temperature = temperature
         self.scale_factor = scale_factor
@@ -51,9 +51,4 @@ class KPDetector(nn.Module):
 
         out = self.gaussian2kp(heatmap)
 
-        motion_flow = self.heatmap(feature_map)
-        motion_shape = motion_flow.shape
-        out['motion_flow'] = motion_flow.view(motion_shape[0], -1, motion_shape[2], motion_shape[3], 2)
-
         return out
-

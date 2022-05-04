@@ -1,7 +1,7 @@
 from torch import nn
 import torch.nn.functional as F
 import torch
-from .util import Hourglass, AntiAliasInterpolation2d, make_coordinate_grid, kp2gaussian
+from .util import Hourglass, AntiAliasInterpolation2d, kp2grid, make_coordinate_grid, kp2grid
 
 
 class DenseMotionNetwork(nn.Module):
@@ -26,12 +26,14 @@ class DenseMotionNetwork(nn.Module):
 
     def create_heatmap_representations(self, source_image, kp_driving, kp_source):
         spatial_size = source_image.shape[2:]
-        heatmap = kp_source['motion_flow'] - kp_driving['motion_flow']  # (1,10,64,64,2)
-        zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1],2).type(heatmap.type())
+        grid_driving = kp2grid(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance)
+        grid_source = kp2grid(kp_source, spatial_size=spatial_size, kp_variance=self.kp_variance)
+        heatmap = grid_driving - grid_source
+
+        #adding background feature
+        zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1], 2).type(heatmap.type())
         heatmap = torch.cat([zeros, heatmap], dim=1)
-
         return heatmap
-
 
     def forward(self, source_image, kp_driving, kp_source):
         if self.scale_factor != 1:
